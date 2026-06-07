@@ -223,7 +223,7 @@ const verifyEmail = asyncHandler(async(req,res) =>{
 
     const otpDoc = await otpModel.findOne({email}).sort({createdAt:-1})
     if(!otpDoc){
-        throw new ApiError(400, "OTP not found")
+        throw new ApiError(400, "OTP expired or invalid")
     }
 
     const isOtpValid = await bcrypt.compare(otp,otpDoc.otpHash)
@@ -231,7 +231,7 @@ const verifyEmail = asyncHandler(async(req,res) =>{
         throw new ApiError(400, "Invalid OTP")
     }
 
-    const user = await userModel.findByIdAndUpdate(otpDoc.user,{verified:true},{new:true})
+    const user = await userModel.findByIdAndUpdate(otpDoc.user,{verified:true},{returnDocument:'after'})
     await otpModel.deleteMany({email})
     const refreshToken = jwt.sign({
         id:user._id,

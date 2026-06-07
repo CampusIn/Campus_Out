@@ -7,9 +7,9 @@ const authRouter  = Router();
 
 
 authRouter.post('/register',validators.registerValidationRules,authControllers.register)
-authRouter.post('/refresh-token',validators.loginValidationRules,authControllers.refreshToken)
+authRouter.post('/refresh-token',authControllers.refreshToken)
 authRouter.post('/logout',authControllers.logout)
-authRouter.post('/logout-all',validators.loginValidationRules,authControllers.logoutAll)
+authRouter.post('/logout-all',authControllers.logoutAll)
 authRouter.post('/login',validators.loginValidationRules,authControllers.login)
 authRouter.post('/verify-email',validators.verifyEmailValidationRules,authControllers.verifyEmail)
 export default authRouter

@@ -10,7 +10,7 @@ restaurantRoute.post('/restaurants',authMiddleware,roleMiddleware('vendor'),rest
 restaurantRoute.patch('/restaurants/:id',authMiddleware,roleMiddleware('vendor'),restaurantController.updateRestaurant);
 restaurantRoute.get('/restaurants/my',authMiddleware,roleMiddleware('vendor'),restaurantController.getMyRestaurants);
 restaurantRoute.get('/restaurants/:id',authMiddleware,restaurantController.getRestaurantById);
-restaurantRoute.delete('/restaurants/:id',authMiddleware,roleMiddleware('vendor'),restaurantValidationRules,restaurantController.dltRestaurantById);
+restaurantRoute.delete('/restaurants/:id',authMiddleware,roleMiddleware('vendor'),restaurantController.dltRestaurantById);
 restaurantRoute.patch('/restaurants/:id/status',authMiddleware,roleMiddleware('vendor'),restaurantValidationRules,restaurantController.updateRestaurantStatus)
 
 export default restaurantRoute;
