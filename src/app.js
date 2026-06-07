@@ -2,6 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import authRouter from './routes/auth.routes.js';
+import restaurantRoute from './routes/restaurant.routes.js';
 import ApiError from './utils/apiErrors.js';
 
 
@@ -12,6 +13,7 @@ app.use(morgan('dev'));
 app.use(cookieParser());
 
 app.use('/api/auth',authRouter)
+app.use('/api',restaurantRoute)
 
 app.use((err, req, res, next) => {
     const statusCode = err instanceof ApiError ? err.statusCode : 500;

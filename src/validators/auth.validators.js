@@ -72,7 +72,7 @@ const verifyEmailValidationRules = [
         validateResult
 ]
 
-module.exports = {
+export default {
     registerValidationRules,
     loginValidationRules,
     verifyEmailValidationRules

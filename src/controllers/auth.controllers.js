@@ -12,7 +12,7 @@ import ApiResponse from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
 const register = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password, role } = req.body;
 
     if (!username || !email || !password) {
         throw new ApiError(400, "Username, email and password are required")
@@ -33,7 +33,8 @@ const register = asyncHandler(async (req, res) => {
     const newUser = await userModel.create({
         username,
         email,
-        password: hashedPassword
+        password: hashedPassword,
+        role
     })
 
     const otp = generateOTP();
@@ -88,6 +89,7 @@ const login = asyncHandler(async(req,res)=>{
 
     const refreshToken = jwt.sign({
         id:user._id,
+        role:user.role,
     },config.JWT_SECRET,{
         expiresIn:'7d'
     })
@@ -102,7 +104,8 @@ const login = asyncHandler(async(req,res)=>{
 
     const accessToken = jwt.sign({
         id:user._id,
-        sessionId: session._id
+        sessionId: session._id,
+        role:user.role
     },config.JWT_SECRET,{
         expiresIn:'15m'
     })
@@ -119,7 +122,7 @@ const login = asyncHandler(async(req,res)=>{
     )
 })
 
-const resfreshToken = asyncHandler(async (req, res) => {
+const refreshToken = asyncHandler(async (req, res) => {
     const {refreshToken} = req.cookies;
     if (!refreshToken) {
         throw new ApiError(401, "Unauthorised, refresh token not found")
@@ -130,19 +133,25 @@ const resfreshToken = asyncHandler(async (req, res) => {
         refreshTokenHash,
         revoked:false
     })
+    const user = await userModel.findById(decoded.id)
+    if(!user){
+        throw new ApiError(401,"User not found")
+    }
 
     if(!session){
         throw new ApiError(400, "No session in progress")
     }
     const newAccessToken = jwt.sign({
         id: decoded.id,
+        role:user.role
     }, config.JWT_SECRET,
         {
             expiresIn: '15m'
         })
     
     const newRefeshToken = jwt.sign({
-        id:decoded.id
+        id:decoded.id,
+        role:user.role
     },config.JWT_SECRET,{
         expiresIn: '7d'
     })
@@ -226,6 +235,7 @@ const verifyEmail = asyncHandler(async(req,res) =>{
     await otpModel.deleteMany({email})
     const refreshToken = jwt.sign({
         id:user._id,
+        role:user.role
     },config.JWT_SECRET,{
         expiresIn:'7d'
     })
@@ -238,7 +248,8 @@ const verifyEmail = asyncHandler(async(req,res) =>{
         userAgent:req.headers["user-agent"]
     })
     const accessToken = jwt.sign({
-        id:user._id
+        id:user._id,
+        role:user.role
     },config.JWT_SECRET,{
         expiresIn:'15m'
     })
@@ -265,4 +276,4 @@ const verifyEmail = asyncHandler(async(req,res) =>{
     )
 })
 
-export default { register, resfreshToken, logout, logoutAll, login, verifyEmail }
+export default { register, refreshToken, logout, logoutAll, login, verifyEmail }
