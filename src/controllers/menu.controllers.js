@@ -29,6 +29,7 @@ const createMenuItem = asyncHandler(async(req,res)=>{
     })
     return res.status(201).json(new ApiResponse(201, menuCreated, "Menu item created successfully"))
 });
+
 const getRestaurantMenu = asyncHandler(async(req,res)=>{
     const{restaurantId} = req.params;
     if(!mongoose.Types.ObjectId.isValid(restaurantId)){
@@ -47,7 +48,24 @@ const getRestaurantMenu = asyncHandler(async(req,res)=>{
     return res.status(200).json(new ApiResponse(200,"Menu fetched successfuly",menuItems))
 });
 
+const getMenuItemById = asyncHandler(async(req,res)=>{
+    const {id} = req.params;
+    if(!mongoose.Types.ObjectId.isValid(id)){
+        throw new ApiError(400,"Id not found")
+    }
+    const menuItem = await menuModel.findOne({
+        _id:id,
+        isDeleted:false
+    })
+    if(!menuItem){
+        throw new ApiError(404,"Menu item not found")
+    }
+
+    return res.status(200).json(new ApiResponse(200,"Menu items fetched successfuly",menuItem))
+})
+
 export default { 
     createMenuItem,
-    getRestaurantMenu
+    getRestaurantMenu,
+    getMenuItemById
 }

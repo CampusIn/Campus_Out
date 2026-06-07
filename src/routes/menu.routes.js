@@ -7,5 +7,5 @@ const menuRouter = Router();
 
 menuRouter.post('/:restaurantId/menu',authMiddleware,roleMiddleware("vendor"),menuValidationRules,menuController.createMenuItem)
 menuRouter.get('/:restaurantId/menu',menuController.getRestaurantMenu)
-
+menuRouter.get('/menu/:id',menuController.getMenuItemById)
 export default menuRouter;
