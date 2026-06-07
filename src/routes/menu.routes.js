@@ -6,5 +6,6 @@ import menuController from "../controllers/menu.controllers.js";
 const menuRouter = Router();
 
 menuRouter.post('/:restaurantId/menu',authMiddleware,roleMiddleware("vendor"),menuValidationRules,menuController.createMenuItem)
+menuRouter.get('/:restaurantId/menu',menuController.getRestaurantMenu)
 
 export default menuRouter;
