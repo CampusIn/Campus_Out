@@ -113,12 +113,13 @@ const updateRestaurantStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Bad Request")
     }
     const restaurant = await restaurantModel.findById(req.params.id)
-    if (restaurant.owner.toString() !== req.user.id.toString()) {
-        throw new ApiError(403, "Not authorised")
-    }
     if (!restaurant) {
         throw new ApiError(404, 'Restaurant not found')
     }
+    if (restaurant.owner.toString() !== req.user.id.toString()) {
+        throw new ApiError(403, "Not authorised")
+    }
+    
 
     restaurant.isOpen = req.body.isOpen
     await restaurant.save()
