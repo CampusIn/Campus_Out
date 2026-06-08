@@ -50,7 +50,7 @@ const updateRestaurant = asyncHandler(async (req, res) => {
 
     const filteredBody = {};
     allowedFields.forEach(field => {
-        if(req.body[field]!==undefined){
+        if (req.body[field] !== undefined) {
             filteredBody[field] = req.body[field]
         }
     })
@@ -119,11 +119,62 @@ const updateRestaurantStatus = asyncHandler(async (req, res) => {
     if (restaurant.owner.toString() !== req.user.id.toString()) {
         throw new ApiError(403, "Not authorised")
     }
-    
+
 
     restaurant.isOpen = req.body.isOpen
     await restaurant.save()
     return res.status(200).json(new ApiResponse(200, restaurant))
+});
+
+const getAllRestaurantsByUser = asyncHandler(async (req, res) => {
+    const { search, page = 1, limit = 10 } = req.query
+    const filter = {
+        isOpen: true
+    }
+    if (search) {
+        filter.restaurantName = {
+            $regex: search,
+            $options: "i"
+        }
+    }
+
+
+
+    const pageNumber = parseInt(page) || 1
+    const limitNumber = parseInt(limit) || 10
+    const skip = (pageNumber - 1) * limitNumber
+    const restaurant = await restaurantModel
+        .find(filter)
+        .skip(skip)
+        .limit(limitNumber)
+    const totalRestaurant = await restaurantModel.countDocuments(filter)
+    const totalPages = Math.ceil(totalRestaurant / limitNumber)
+    return res.status(200).json(new ApiResponse(200, "Restaurant fetched successfuly", {
+        restaurant,
+        pagination: {
+            page: pageNumber,
+            limit: limitNumber,
+            totalPages,
+            totalRestaurant
+        }
+    }))
+});
+
+const getRestaurantByUser = asyncHandler(async(req,res)=>{
+    const {id} = req.params
+    if(!mongoose.Types.ObjectId.isValid(id)){
+        throw new ApiError(400,"Bad Request")
+    }
+
+    const restaurant = await restaurantModel.findOne({
+        _id:id,
+        isOpen:true
+    },"-owner -minimumOrder")
+    if(!restaurant){
+        throw new ApiError(404,"Restaurant not found")
+    }
+
+    return res.status(200).json(new ApiResponse(200,"Restaurant fetched successful",restaurant))
 })
 
 
@@ -133,5 +184,7 @@ export default {
     getMyRestaurants,
     getRestaurantById,
     dltRestaurantById,
-    updateRestaurantStatus
+    updateRestaurantStatus,
+    getAllRestaurantsByUser,
+    getRestaurantByUser
 }

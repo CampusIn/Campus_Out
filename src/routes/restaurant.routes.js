@@ -11,6 +11,8 @@ restaurantRoute.patch('/restaurants/:id',authMiddleware,roleMiddleware('vendor')
 restaurantRoute.get('/restaurants/my',authMiddleware,roleMiddleware('vendor'),restaurantController.getMyRestaurants);
 restaurantRoute.get('/restaurants/:id',authMiddleware,restaurantController.getRestaurantById);
 restaurantRoute.delete('/restaurants/:id',authMiddleware,roleMiddleware('vendor'),restaurantController.dltRestaurantById);
-restaurantRoute.patch('/restaurants/:id/status',authMiddleware,roleMiddleware('vendor'),restaurantValidationRules,restaurantController.updateRestaurantStatus)
+restaurantRoute.patch('/restaurants/:id/status',authMiddleware,roleMiddleware('vendor'),restaurantValidationRules,restaurantController.updateRestaurantStatus);
+restaurantRoute.get('/restaurants',restaurantController.getAllRestaurantsByUser)
+restaurantRoute.get('/restaurant/:id',restaurantController.getRestaurantByUser)
 
 export default restaurantRoute;
