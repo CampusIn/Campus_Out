@@ -71,6 +71,7 @@ const addToCart = asyncHandler(async (req, res) => {
     return res.status(201).json(new ApiResponse(201, "Items added to cart", cart))
 });
 
+//debug this
 const getItemsFromCart = asyncHandler(async (req, res) => {
     let cart = await cartModel.findOne({
         user: req.user.id
@@ -95,6 +96,64 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
     cart.items = cart.items.filter((item) => {
         if (item.menuItem) return item
     })
+    
+    const menuIdOnly = cart.items.map(item=>item.menuItem)
+    const menus = await menuModel.find({
+        _id:{
+            $in:menuIdOnly
+        }
+    })
+
+    
+
+    const calculatedAmount = cart.items.reduce((sum,item)=>{
+        const menu = menus.find(menu=>menu._id.toString() === item.menuItem.toString())
+        if(!menu) throw new ApiError(400,"One or more items in your cart is not available")
+        const finalPrice = item.quantity * menu.price
+        return sum + finalPrice
+    }, 0)
+
+    cart.totalAmount = calculatedAmount
+    await cart.save()
+
+
+    return res.status(200).json(new ApiResponse(200, "Cart fetched successfuly", {
+        "restaurant": cart.restaurant,
+        "items": cart.items,
+        "totalAmount": cart.totalAmount
+
+    }))
+
+});
+
+const updateCartItemQuantity = asyncHandler(async(req,res)=>{
+    const {menuItemId} = req.params
+    const {quantity} = req.body
+    if(quantity<1){
+        throw new ApiError(400,"Inavlid quantity")
+    }
+    if(!mongoose.Types.ObjectId.isValid(menuItemId)){
+        throw new ApiError(400,"Menu Item Id is not valid")
+    }
+
+    const cart = await cartModel.findOne({
+        user:req.user.id
+    })
+    if(!cart){
+        throw new ApiError(404,"Cart not found")
+    }
+
+    const item = cart.items.find((item)=>{
+        if(item.menuItem.toString() === menuItemId){
+            return item
+        }
+    })
+
+    if(!item){
+        throw new ApiError(404,"No such item in the cart")
+    }
+
+    item.quantity = quantity
 
     const menuIdOnly = cart.items.map(item=>item.menuItem)
     const menus = await menuModel.find({
@@ -110,15 +169,19 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
         return sum + finalPrice
     }, 0)
 
-    return res.status(200).json(new ApiResponse(200, "Cart fetched successfuly", {
-        "restaurant": cart.restaurant,
-        "items": cart.items,
-        "totalAmount": calculatedAmount
+    cart.totalAmount = calculatedAmount
+    await cart.save()
 
+    
+
+    return res.status(200).json(new ApiResponse(200,"Quantity updated",{
+        "items":cart.items,
+        "totalAmount":cart.totalAmount
     }))
+});
 
-})
 export default {
     addToCart,
-    getItemsFromCart
+    getItemsFromCart,
+    updateCartItemQuantity
 }
