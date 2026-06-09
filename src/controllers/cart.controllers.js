@@ -42,11 +42,11 @@ const addToCart = asyncHandler(async (req, res) => {
         return item.menuItem.toString() === menuItemId.toString()
     })
 
-    if(existingItem){
+    if (existingItem) {
         existingItem.quantity += quantity
-    }else{
+    } else {
         cart.items.push({
-            menuItem:menuItemId,
+            menuItem: menuItemId,
             quantity
         })
     }
@@ -63,13 +63,62 @@ const addToCart = asyncHandler(async (req, res) => {
         if(!menu) throw new ApiError(400,"One or more items in your cart is not available")
         const finalPrice = item.quantity * menu.price
         return sum + finalPrice
-    },0)
+    }, 0)
 
     cart.totalAmount = calculatedAmount
     await cart.save()
 
-    return res.status(201).json(new ApiResponse(201,"Items added to cart",cart))
+    return res.status(201).json(new ApiResponse(201, "Items added to cart", cart))
+});
+
+const getItemsFromCart = asyncHandler(async (req, res) => {
+    let cart = await cartModel.findOne({
+        user: req.user.id
+    }).populate({
+        path: 'restaurant',
+        select: 'restaurantName'
+    })
+
+    if (!cart) {
+        return res.status(200).json(new ApiResponse(200, "No items in the cart", cart = {
+            restaurant: null,
+            items: [],
+            totalAmount: 0
+        }))
+    }
+
+    await cart.populate({
+        path: 'items.menuItem',
+        select: 'name price image'
+    })
+
+    cart.items = cart.items.filter((item) => {
+        if (item.menuItem) return item
+    })
+
+    const menuIdOnly = cart.items.map(item=>item.menuItem)
+    const menus = await menuModel.find({
+        _id:{
+            $in:menuIdOnly
+        }
+    })
+
+    const calculatedAmount = cart.items.reduce((sum,item)=>{
+        const menu = menus.find(menu=>menu._id.toString() === item.menuItem.toString())
+        if(!menu) throw new ApiError(400,"One or more items in your cart is not available")
+        const finalPrice = item.quantity * menu.price
+        return sum + finalPrice
+    }, 0)
+
+    return res.status(200).json(new ApiResponse(200, "Cart fetched successfuly", {
+        "restaurant": cart.restaurant,
+        "items": cart.items,
+        "totalAmount": calculatedAmount
+
+    }))
+
 })
 export default {
-    addToCart
+    addToCart,
+    getItemsFromCart
 }
