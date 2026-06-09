@@ -106,15 +106,22 @@ Base path: `/api`
 - `POST /restaurants` — vendor only
 - `PATCH /restaurants/:id` — vendor only
 - `GET /restaurants/my` — vendor only
-- `GET /restaurants/:id`
+- `GET /restaurants/:id` — authenticated owner-only lookup
 - `DELETE /restaurants/:id` — vendor only
 - `PATCH /restaurants/:id/status` — vendor only
+- `GET /restaurants` — public listing of open restaurants
+- `GET /restaurant/:id` — public fetch of a single open restaurant by id
 
-Expected request fields:
+Expected request fields and behavior:
 
-- `POST /restaurants`: `restaurantName`, `phone`, `description`, `location`, `category`
-- `PATCH /restaurants/:id`: any editable restaurant fields supported by the controller
-- `PATCH /restaurants/:id/status`: `isOpen`
+- `POST /restaurants`: creates a restaurant (vendor only). Body: `restaurantName`, `phone`, `description`, `location`, `category`.
+- `PATCH /restaurants/:id`: updates a restaurant (vendor only & owner-only). Accepts editable fields: `restaurantName`, `description`, `category`, `phone`, `email`, `logo`, `banner`, `location`, `deliveryTime`, `minimumOrder`, `isOpen`.
+- `GET /restaurants/my`: returns restaurants owned by the authenticated vendor.
+- `GET /restaurants/:id`: authenticated route that returns the restaurant only to its owner (vendor).
+- `DELETE /restaurants/:id`: deletes a restaurant (vendor only & owner-only).
+- `PATCH /restaurants/:id/status`: toggles open/closed (vendor only & owner-only). Body: `isOpen` (boolean).
+- `GET /restaurants`: public listing of open restaurants. Supports query params: `search` (partial name match), `page` (default 1), `limit` (default 10).
+- `GET /restaurant/:id`: public fetch of a single open restaurant by id — returns a limited projection (owner and `minimumOrder` omitted).
 
 ### Menu
 
@@ -137,6 +144,29 @@ Notes:
 
 - Menu updates and deletes use ownership checks, so vendors can only manage their own menu items.
 - Deleting a menu item is soft delete; the item is marked deleted instead of being removed from the database.
+
+### Cart
+
+Base path: `/api/user`
+
+- `POST /cart/items` — authenticated `user` only; adds items to the authenticated user's cart.
+
+Behavior and request fields:
+
+- Request body: `menuItemId` (ObjectId), `quantity` (number, >= 1).
+- Creates a new cart for the user if none exists. Each user has at most one cart (cart `user` is unique).
+- The cart stores `restaurant` (ObjectId) and `items` (array of `{ menuItem, quantity }`).
+- Adding items is allowed only when all items belong to the same restaurant; attempting to add items from a different restaurant returns `409 Conflict`.
+- Items must be available (`menu.isAvailable` true); otherwise the request fails with `400`.
+- `totalAmount` is recalculated from current menu prices and stored on the cart.
+- Successful addition returns `201 Created` with the updated cart object.
+
+Model summary (`Cart`):
+
+- `user`: ObjectId (ref `User`, unique) — owner of the cart.
+- `restaurant`: ObjectId (ref `Restaurant`) — restaurant associated with the cart items.
+- `items`: array of `{ menuItem: ObjectId (ref `Menu`), quantity: Number }`.
+- `totalAmount`: Number — computed total for the cart.
 
 ## Authentication flow
 

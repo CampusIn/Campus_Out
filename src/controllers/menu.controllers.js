@@ -71,20 +71,12 @@ const updateMenuItem = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Bad Request")
     }
     const menuItem = await verifyMenuOwnership(id, req.user.id)
-    if (!restaurant) {
-        throw new ApiError(404, "Restaurant Not Found")
-    }
-
-    if (restaurant.owner.toString() !== req.user.id.toString()) {
-        throw new ApiError(403, "Forbidden")
-    }
-
     const allowedFields = [
         'name',
         'description',
         'price',
         'category',
-        'iamge'
+        'image'
     ]
 
     const filteredBody = {}
