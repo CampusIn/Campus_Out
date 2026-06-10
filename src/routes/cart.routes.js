@@ -8,4 +8,6 @@ const cartRouter = Router();
 cartRouter.post('/cart/items',authMiddleware,roleMiddleware('user'),cartControllers.addToCart)
 cartRouter.get('/cart',authMiddleware,roleMiddleware('user'),cartControllers.getItemsFromCart)
 cartRouter.patch('/cart/items/:menuItemId',authMiddleware,roleMiddleware('user'),cartControllers.updateCartItemQuantity)
+cartRouter.delete('/cart/items/:menuItemId',authMiddleware,roleMiddleware('user'),cartControllers.deleteCartItem)
+cartRouter.delete('/cart',authMiddleware,roleMiddleware('user'),cartControllers.deleteCart)
 export default cartRouter
