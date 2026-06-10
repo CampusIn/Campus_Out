@@ -1,0 +1,83 @@
+import mongoose from "mongoose"
+
+const cartSnapshotSchema = new mongoose.Schema({
+    menuItem:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Menu",
+        required:true
+    },
+    itemName:{
+        type:String,
+        required:[true,"Item name is required"]
+    },
+    priceAtPurchase:{
+        type:Number,
+        required:[true,"price at purchase is required"]
+    },
+    quantity:{
+        type:Number,
+        min:[1,"Atleast 1 item should be there to order"],
+        required:[true,"Mention quantity"]
+    }
+},{
+    _id:false
+});
+
+
+
+const orderSchema = new mongoose.Schema({
+    user:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"User",
+        required:[true,"User Id is required"]
+    },
+    restaurant:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"Restaurant",
+        required:[true,"Restaurant is required"]
+    },
+    restaurantName:{
+        type:String,
+        required:[true,"Restaurant name is required"]
+    },
+    items:[cartSnapshotSchema],
+    totalAmount:{
+        type:Number,
+        min:[0,"minimum order amount should be 0"],
+        required:[true,"Total amount is required"]
+    },
+    paymentMethod:{
+        type:String,
+        enum:["COD","PAY_ON_PICKUP"],
+        required:[true,"Choose a payment method"]
+    },
+    paymentStatus:{
+        type:String,
+        enum:["PENDING","PAID"],
+        default:"PENDING"
+    },
+    orderStatus:{
+        type:String,
+        enum:[
+            "PENDING",
+            "CONFIRMED",
+            "PREPARING",
+            "READY",
+            "DELIVERED",
+            "CANCELLED"
+        ],
+        default:'PENDING'
+    },
+    orderNumber:{
+        type:String,
+        required:true,
+        unique:true
+    }
+
+},{
+    timestamps:true
+})
+
+const orderModel = mongoose.model("Order",orderSchema)
+
+export default orderModel

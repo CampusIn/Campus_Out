@@ -5,6 +5,7 @@ import authRouter from './routes/auth.routes.js';
 import restaurantRoute from './routes/restaurant.routes.js';
 import menuRouter from './routes/menu.routes.js';
 import cartRouter from './routes/cart.routes.js';
+import orderRouter from './routes/order.routes.js';
 import ApiError from './utils/apiErrors.js';
 
 
@@ -18,6 +19,7 @@ app.use('/api/auth',authRouter)
 app.use('/api',restaurantRoute)
 app.use('/api/restaurants',menuRouter)
 app.use('/api/user',cartRouter)
+app.use('/api/user',orderRouter)
 
 app.use((err, req, res, next) => {
     const statusCode = err instanceof ApiError ? err.statusCode : 500;

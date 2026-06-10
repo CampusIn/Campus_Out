@@ -57,7 +57,6 @@ const addToCart = asyncHandler(async (req, res) => {
     return res.status(201).json(new ApiResponse(201, "Items added to cart", finalCart))
 });
 
-//debug this
 const getItemsFromCart = asyncHandler(async (req, res) => {
     let cart = await cartModel.findOne({
         user: req.user.id
