@@ -153,20 +153,32 @@ Base path: `/api/user`
 
 Behavior and request fields:
 
-- Request body: `menuItemId` (ObjectId), `quantity` (number, >= 1).
-- Creates a new cart for the user if none exists. Each user has at most one cart (cart `user` is unique).
-- The cart stores `restaurant` (ObjectId) and `items` (array of `{ menuItem, quantity }`).
-- Adding items is allowed only when all items belong to the same restaurant; attempting to add items from a different restaurant returns `409 Conflict`.
-- Items must be available (`menu.isAvailable` true); otherwise the request fails with `400`.
-- `totalAmount` is recalculated from current menu prices and stored on the cart.
-- Successful addition returns `201 Created` with the updated cart object.
+- Routes:
+  - `POST /cart/items` — adds items to the authenticated user's cart (returns `201 Created`).
+  - `GET /cart/items` — fetches the authenticated user's cart (returns `200 OK`).
+  - `PATCH /cart/items/:menuItemId` — updates an item's quantity in the cart (returns `200 OK`).
+  - `DELETE /cart/items/:menuItemId` — removes a single item from the cart (returns `200 OK`).
+  - `DELETE /cart` — deletes the authenticated user's entire cart (returns `200 OK`).
+
+- Request body for add/update: `menuItemId` (ObjectId), `quantity` (number, >= 1).
+- Validation and errors:
+  - `menuItemId` must be a valid MongoDB ObjectId — otherwise `400 Bad Request`.
+  - `quantity` must be >= 1 — otherwise `400 Bad Request`.
+  - Adding items from different restaurants returns `409 Conflict`.
+  - If a referenced menu item no longer exists or is unavailable, requests will fail with `400`.
+
+- Behavior details:
+  - A `cartTotal` utility is used by the controllers to recompute and persist `totalAmount` after add, update, and delete operations. Totals are computed from the current `menu.price` values.
+  - If the user has no existing cart, a new cart is created on first add with the `restaurant` set to the added item's restaurant.
+  - When deleting an item, if it was the last item in the cart the cart document is removed and the API responds with an empty cart (restaurant `null`, empty `items`, `totalAmount: 0`).
+  - `GET /cart/items` populates the `restaurant` (selecting `restaurantName`) and each `items.menuItem` (selecting `name`, `price`, `image`). The controller filters out any items whose referenced `menuItem` no longer exists before returning results and recalculates `totalAmount`.
 
 Model summary (`Cart`):
 
 - `user`: ObjectId (ref `User`, unique) — owner of the cart.
 - `restaurant`: ObjectId (ref `Restaurant`) — restaurant associated with the cart items.
 - `items`: array of `{ menuItem: ObjectId (ref `Menu`), quantity: Number }`.
-- `totalAmount`: Number — computed total for the cart.
+- `totalAmount`: Number — computed total for the cart and persisted after changes.
 
 ## Authentication flow
 
