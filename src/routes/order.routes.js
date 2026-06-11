@@ -5,7 +5,11 @@ import orderController from "../controllers/order.controllers.js";
 
 const orderRouter = Router();
 
-orderRouter.post('/order',authMiddleware, roleMiddleware("user"), orderController.createOrder)
+orderRouter.post('/order',authMiddleware, roleMiddleware('user'), orderController.createOrder)
 orderRouter.get('/orders/my',authMiddleware,roleMiddleware('user'),orderController.getAllOrders)
+orderRouter.get('/orders/:orderId',authMiddleware,roleMiddleware('user'),orderController.getSingleOrder)
+orderRouter.patch('/orders/:orderId/cancel',authMiddleware,roleMiddleware('user'),orderController.cancelOrder)
+orderRouter.get('/order/restaurant',authMiddleware,roleMiddleware('vendor'),orderController.getVendorOrder)
+orderRouter.patch('/order/:orderId/status',authMiddleware,roleMiddleware('vendor'),orderController.changeOrderStatus)
 
-export default orderRouter;
+export default orderRouter; 
