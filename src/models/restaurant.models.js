@@ -71,9 +71,13 @@ const restaurantSchema = new mongoose.Schema(
             default: true
         },
 
-        rating: {
+        averageRating: {
             type: Number,
             default: 0
+        },
+        reviewCount:{
+            type:Number,
+            default:0
         }
     },
     {
