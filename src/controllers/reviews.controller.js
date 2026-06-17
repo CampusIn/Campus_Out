@@ -6,6 +6,7 @@ import ApiError from '../utils/apiErrors.js';
 import ApiResponse from '../utils/apiResponse.js';
 import updateRestaurantRating from "../utils/updateRestaurantReview.utils.js"
 import mongoose from "mongoose";
+import { response } from 'express';
 
 const createReview = asyncHandler(async (req, res) => {
     const { restaurantId } = req.params
@@ -50,7 +51,7 @@ const createReview = asyncHandler(async (req, res) => {
 
     await updateRestaurantRating(restaurantId)
 
-    return res.status(201).json(new ApiResponse(201, "Rating created successfuly", review))
+    return res.status(201).json(new ApiResponse(201, "Rating created successfully", review))
 });
 
 const getAllReview = asyncHandler(async (req, res) => {
@@ -116,9 +117,68 @@ const getAllReview = asyncHandler(async (req, res) => {
 
         }
     }))
+});
+
+const updateReview = asyncHandler(async(req,res) =>{
+    const {reviewId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(reviewId)){
+        throw new ApiError(400,"Review Id is invalid")
+    }
+
+    const review = await reviewModel.findById(reviewId)
+    if(!review){
+        throw new ApiError(404,"Review not found")
+    }
+
+    if(review.user.toString() !== req.user.id){
+        throw new ApiError(403,"This review is not done by you")
+    }
+    const {rating = review.rating , comment = review.comment } = req.body
+
+    if(rating<1 || rating>5){
+        throw new ApiError(400,"Rating shoud be between 1 and 5")
+    }
+    const restaurantId = review.restaurant
+    review.rating = rating
+    review.comment = comment
+    await review.save()
+    await updateRestaurantRating(restaurantId)
+
+    return res.status(200).json(new ApiResponse(200,"Review updated successfuly",review))
+
+});
+
+const deleteReview = asyncHandler(async(req,res) =>{
+    const {reviewId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(reviewId)){
+        throw new ApiError(400,"Review ID is invalid")
+    }
+
+    const review = await reviewModel.findById(reviewId)
+    if(!review){
+        throw new ApiError(404,"No reviews found")
+    }
+
+    if(review.user.toString()!==req.user.id){
+        throw new ApiError(403,"Forbidden")
+    }
+
+    const restaurantId = review.restaurant
+    await review.deleteOne()
+    await updateRestaurantRating(restaurantId)
+
+    const restaurant = await restaurantModel.findById(restaurantId)
+    const {averageRating,reviewCount} = restaurant
+    return res.status(200).json(new ApiResponse(201,"Reviews deleted successfully",{
+        averageRating,
+        reviewCount
+    }))
+
 })
 
 export default {
     createReview,
-    getAllReview
+    getAllReview,
+    updateReview,
+    deleteReview
 }

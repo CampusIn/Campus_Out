@@ -10,4 +10,8 @@ reviewRoute.post('/reviews/:restaurantId',authMiddleware,roleMiddleware('user'),
 
 reviewRoute.get('/restaurants/:restaurantId/reviews',reviewsController.getAllReview)
 
+reviewRoute.patch('/reviews/:reviewId',authMiddleware,roleMiddleware('user'),reviewsController.updateReview)
+
+reviewRoute.delete('/reviews/:reviewId',authMiddleware,roleMiddleware('user'),reviewsController.deleteReview)
+
 export default reviewRoute

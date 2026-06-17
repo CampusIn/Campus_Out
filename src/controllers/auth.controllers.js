@@ -52,12 +52,12 @@ const register = asyncHandler(async (req, res) => {
     res.status(201).json(
         new ApiResponse(
             201,
+            "User registered successfully. Please verify your email",
             {
                 username,
                 email,
                 verified: newUser.verified
-            },
-            "User registered successfully. Please verify your email"
+            }
         )
     )
 
@@ -112,13 +112,13 @@ const login = asyncHandler(async(req,res)=>{
 
     res.cookie('refreshToken',refreshToken,{
         httpOnly:true,
-        secure:true,
-        sameSite:'strict',
+        secure:false,
+        sameSite:'lax',
         maxAge: 7*24*60*60*1000
     })
 
     res.status(200).json(
-        new ApiResponse(200, { accessToken }, "Login successful")
+        new ApiResponse(200, "Login successful", { accessToken })
     )
 })
 
@@ -161,13 +161,13 @@ const refreshToken = asyncHandler(async (req, res) => {
     await session.save();
     res.cookie('refreshToken',newRefeshToken,{
         httpOnly:true,
-        secure:true,
-        sameSite:"strict",
+        secure:false,
+        sameSite:'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000
     })
 
     res.status(201).json(
-        new ApiResponse(201, { accessToken: newAccessToken }, "New access token created")
+        new ApiResponse(201, "New access token created", { accessToken: newAccessToken })
     )
 })
 
@@ -256,13 +256,14 @@ const verifyEmail = asyncHandler(async(req,res) =>{
 
     res.cookie('refreshToken',refreshToken,{
         httpOnly:true,
-        secure:true,
-        sameSite:'strict',
+        secure:false,
+        sameSite:'lax',
         maxAge: 7*24*60*60*1000
     })
     return res.status(200).json(
         new ApiResponse(
             200,
+            "Email verified successfully",
             {
                 user:{
                     username:user.username,
@@ -270,8 +271,7 @@ const verifyEmail = asyncHandler(async(req,res) =>{
                     verified:user.verified
                 },
                 accessToken,
-            },
-            "Email verified successfully"
+            }
         )
     )
 })

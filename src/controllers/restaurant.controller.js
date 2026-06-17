@@ -127,7 +127,7 @@ const updateRestaurantStatus = asyncHandler(async (req, res) => {
 });
 
 const getAllRestaurantsByUser = asyncHandler(async (req, res) => {
-    const { search, page = 1, limit = 10 } = req.query
+    const { search, page = 1, limit = 10, category } = req.query
     const filter = {
         isOpen: true
     }
@@ -137,8 +137,9 @@ const getAllRestaurantsByUser = asyncHandler(async (req, res) => {
             $options: "i"
         }
     }
-
-
+    if (category) {
+        filter.category = category
+    }
 
     const pageNumber = parseInt(page) || 1
     const limitNumber = parseInt(limit) || 10

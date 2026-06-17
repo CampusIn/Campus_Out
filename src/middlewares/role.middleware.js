@@ -7,7 +7,7 @@ const roleMiddleware = (role) =>{
             throw new ApiError(401,"Unauthorized")
         }
         if(req.user.role !==role){
-            throw new ApiError(403,"Forbidden as fuck")
+            throw new ApiError(403,"Forbidden")
         }
         next();
     })
