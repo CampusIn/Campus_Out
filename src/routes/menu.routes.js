@@ -8,7 +8,7 @@ import { menuStatusValidationRule } from "../validators/menuStatus.validators.js
 import upload from "../middlewares/multer.middlewares.js"
 const menuRouter = Router();
 
-menuRouter.post('/:restaurantId/menu', authMiddleware, roleMiddleware("vendor"),upload.single('image'), menuValidationRules, menuController.createMenuItem)
+menuRouter.post('/:restaurantId/menu', authMiddleware, roleMiddleware("vendor"), upload.single('image'), menuValidationRules, menuController.createMenuItem)
 menuRouter.get('/:restaurantId/menu', menuController.getRestaurantMenu)
 menuRouter.get('/menu/:id', menuController.getMenuItemById)
 menuRouter.patch('/menu/:id', authMiddleware, roleMiddleware('vendor'), menuUpdateValidationRules, menuController.updateMenuItem)

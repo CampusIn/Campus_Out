@@ -71,7 +71,7 @@ const getMyRestaurants = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new ApiResponse(200, "The fetched restaurants are", restaurant))
 });
-//debug this
+
 const getRestaurantById = asyncHandler(async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         throw new ApiError(400, "Invalid Id")
