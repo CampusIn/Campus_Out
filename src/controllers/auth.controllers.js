@@ -128,19 +128,26 @@ const refreshToken = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Unauthorised, refresh token not found")
     }
     const refreshTokenHash = await crypto.createHash('sha256').update(refreshToken).digest('hex')
-    const decoded = jwt.verify(refreshToken, config.JWT_SECRET)
+    let decoded
+    try {
+        decoded = jwt.verify(refreshToken, config.JWT_SECRET)
+    } catch (error) {
+        throw new ApiError(401,'JWT verification failed')
+    } 
     const session = await sessionModel.findOne({
         refreshTokenHash,
         revoked:false
     })
+    
+    if(!session){
+        throw new ApiError(400, "No session in progress")
+    }
+
     const user = await userModel.findById(decoded.id)
     if(!user){
         throw new ApiError(401,"User not found")
     }
 
-    if(!session){
-        throw new ApiError(400, "No session in progress")
-    }
     const newAccessToken = jwt.sign({
         id: decoded.id,
         role:user.role
@@ -174,7 +181,7 @@ const refreshToken = asyncHandler(async (req, res) => {
 const logout = asyncHandler(async (req,res) =>{
     const {refreshToken} = req.cookies
     if(!refreshToken){
-        throw new ApiError(400, "No refresh token")
+        throw new ApiError(401, "Unauthorised, refresh token not found")
     }
 
     const refreshTokenHash = await crypto.createHash('sha256').update(refreshToken).digest('hex')
