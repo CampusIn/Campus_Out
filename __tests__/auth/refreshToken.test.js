@@ -107,4 +107,48 @@ describe('Refresh Token API', () => {
         expect(sessionAfterDeletion).toBeNull()
     });
     
+    test('User not found, should return 401 error code', async ()=>{
+        await request(app)
+            .post('/api/auth/register')
+            .send({
+                username: 'Joel',
+                email: 'eapenjoel4@gmail.com',
+                password: 'J@2007',
+                role: 'user'
+            })
+        const user = await userModel.findOne({
+            username: 'Joel'
+        })
+
+        user.verified = true
+        await user.save()
+
+
+        const loginResponse = await request(app)
+            .post('/api/auth/login')
+            .set('User-Agent', 'Jest-test')
+            .send({
+                email: 'eapenjoel4@gmail.com',
+                password: 'J@2007'
+            })
+        const cookie = loginResponse.headers['set-cookie']
+
+        await user.deleteOne()
+
+        const userAfterDeletion = await userModel.findOne({
+            username:'Joel'
+        })
+
+        console.log(userAfterDeletion)
+
+
+        const refreshResponse = await request(app)
+            .post('/api/auth/refresh-token')
+            .set('Cookie',cookie)
+        
+        expect(loginResponse.statusCode).toBe(200)
+        expect(refreshResponse.statusCode).toBe(401)
+        expect(refreshResponse.body.message).toBe('User not found')
+        expect(userAfterDeletion).toBeNull()
+    });
 })
