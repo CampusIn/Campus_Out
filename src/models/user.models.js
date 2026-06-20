@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
         enum:['user','vendor','admin'],
         required:[true,'Role is required'],
         default:'user'
+    },
+    isBlocked:{
+        type: Boolean,
+        default: false
     }
 })
 

@@ -1,6 +1,6 @@
 # CAMPUS OUT
 
-Campus Out is a Node.js and Express REST API for a campus food ordering platform. It supports email-verified authentication, role-based access, vendor restaurant/menu management, user cart and order flows, reviews, and admin reporting.
+Campus Out is a Node.js and Express REST API for a campus food ordering platform. It supports email-verified authentication, role-based access, vendor restaurant/menu management, user cart and order flows, reviews, admin moderation, and account/restaurant blocking controls.
 
 > Status: in progress. The main backend workflows are implemented, but deployment hardening, complete test coverage, and full production documentation are still ongoing.
 
@@ -9,13 +9,15 @@ Campus Out is a Node.js and Express REST API for a campus food ordering platform
 - Email-based user registration with OTP verification.
 - JWT access tokens with cookie-based refresh sessions.
 - Role-based access control for `user`, `vendor`, and `admin` roles.
-- Vendor restaurant management with owner-only updates and status controls.
+- Blocked-user protection on protected user/vendor actions.
+- Restaurant suspension checks for vendor-owned restaurant and menu operations.
+- Vendor restaurant management with owner-only updates, activation, and deletion controls.
 - Menu management with image upload support through Multer and Cloudinary.
 - User cart management with single-restaurant cart enforcement and recalculated totals.
 - Order creation from cart snapshots, user order history, cancellation, and vendor status updates.
 - Restaurant reviews from users who have delivered orders.
 - Automatic restaurant rating and review-count updates.
-- Admin dashboard metrics, including users, vendors, restaurants, orders, and delivered-order revenue.
+- Admin dashboard metrics, user/vendor blocking, restaurant suspension, and order lookup tools.
 - Centralized API responses, error handling, async route wrapping, and validation helpers.
 
 ## Tech Stack
@@ -39,7 +41,7 @@ Campus Out is a Node.js and Express REST API for a campus food ordering platform
 src/
   config/         Environment validation and database setup
   controllers/    Route handler logic
-  middlewares/    Authentication, role checks, and upload handling
+  middlewares/    Authentication, role checks, block checks, suspension checks, and upload handling
   models/         Mongoose schemas
   routes/         API route definitions
   services/       Email and Cloudinary integrations
@@ -111,6 +113,13 @@ Authorization: Bearer <accessToken>
 
 Refresh tokens are stored in an `httpOnly` cookie named `refreshToken`. Current cookie settings are `secure: false` and `sameSite: lax` for local development.
 
+Middleware behavior:
+
+- `authMiddleware` reads the bearer token from the `Authorization` header and attaches `req.user`.
+- `roleMiddleware(role)` blocks requests that do not match the required role.
+- `blockMiddleware` blocks users whose `isBlocked` flag is `true`.
+- `restaurantSuspensionMiddleware` blocks vendor actions when the vendor-owned restaurant is suspended.
+
 ## Restaurants
 
 Base path: `/api`
@@ -147,6 +156,8 @@ Public listing query parameters:
 
 Restaurant categories include `Fast Food`, `Cafe`, `Bakery`, `South Indian`, `North Indian`, `Chinese`, and `Other`.
 
+Vendor restaurant update/status and menu operations pass through both `blockMiddleware` and `restaurantSuspensionMiddleware`, so blocked users and vendors with suspended restaurants cannot mutate those resources.
+
 ## Menu
 
 Base path: `/api/restaurants`
@@ -180,6 +191,8 @@ Status update body:
 
 Deleted menu items are marked with `isDeleted: true` instead of being removed from the database.
 
+Menu management routes also enforce vendor ownership, blocked-user checks, and restaurant suspension checks before allowing create, update, status, or delete operations.
+
 ## Cart
 
 Base path: `/api/user`
@@ -208,6 +221,7 @@ Cart behavior:
 - Totals are recalculated from current menu prices after add, update, and delete operations.
 - If the last item is removed, the cart document is deleted and an empty cart response is returned.
 - Cart responses populate restaurant name and menu item details where available.
+- Mutating cart routes are protected by `blockMiddleware`.
 
 ## Orders
 
@@ -253,6 +267,7 @@ Order behavior:
 - Vendors can update orders for their own restaurant to `CONFIRMED`, `PREPARING`, `READY`, or `DELIVERED`.
 - Delivered orders cannot be changed again.
 - Order history and vendor order listing support `page` and `limit` query parameters.
+- Order creation is protected by `blockMiddleware`.
 
 ## Reviews
 
@@ -281,6 +296,7 @@ Review behavior:
 - Each user can review a restaurant only once.
 - Updating or deleting a review recalculates the restaurant's `averageRating` and `reviewCount`.
 - Review listing includes pagination and returns the restaurant rating summary.
+- Review create, update, and delete actions are protected by `blockMiddleware`.
 
 ## Admin
 
@@ -294,6 +310,12 @@ All admin routes require authentication and the `admin` role.
 | GET | `/dashboard/users` | List users with search and pagination. |
 | GET | `/dashboard/vendors` | List vendors with search and pagination. |
 | GET | `/dashboard/restaurants` | List restaurants with filters and pagination. |
+| PATCH | `/users/:id/block` | Block a user. |
+| PATCH | `/users/:id/unblock` | Unblock a user. |
+| PATCH | `/restaurants/:id/suspend` | Suspend a restaurant. |
+| PATCH | `/restaurants/:id/activate` | Reactivate a suspended restaurant. |
+| GET | `/orders` | List all orders with optional status filtering. |
+| GET | `/orders/:id` | Fetch a single order with user and item details. |
 
 Dashboard metrics:
 
@@ -309,16 +331,24 @@ Admin query parameters:
 
 - Users/vendors: `search`, `page`, `limit`.
 - Restaurants: `search`, `category`, `isOpen`, `page`, `limit`.
+- Orders: `status`, `page`, `limit`.
+
+Admin moderation behavior:
+
+- Blocking a user sets `isBlocked` to `true`.
+- Unblocking a user sets `isBlocked` to `false`.
+- Suspending a restaurant sets `isSuspended` to `true`.
+- Activating a restaurant sets `isSuspended` to `false`.
 
 ## Data Models
 
-- `User`: username, email, password hash, verification state, and role.
+- `User`: username, email, password hash, verification state, role, and `isBlocked` moderation flag.
 - `Session`: hashed refresh token, user, IP, user agent, and revoked state.
 - `OTP`: hashed email verification code with expiry behavior.
-- `Restaurant`: vendor owner, profile details, category, status, rating average, and review count.
+- `Restaurant`: vendor owner, profile details, category, open/closed state, suspension state, rating average, and review count.
 - `Menu`: restaurant, item details, price, availability, soft-delete state, and image URL.
 - `Cart`: one cart per user with restaurant, items, quantities, and persisted total.
-- `Order`: user, restaurant, item snapshots, total amount, payment method/status, order status, and order number.
+- `Order`: user, restaurant, restaurant name snapshot, item snapshots, total amount, payment method/status, order status, and order number.
 - `Review`: user, restaurant, rating, comment, and uniqueness across user plus restaurant.
 
 ## Shared Utilities

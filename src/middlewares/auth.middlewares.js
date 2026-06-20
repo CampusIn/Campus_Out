@@ -15,9 +15,15 @@ const authMiddleware = asyncHandler(async(req,res,next)=>{
         throw new ApiError(401,"Unauthorized")
     }
 
+    const user = await userModel.findById(decoded.id)
+    if(!user){
+        throw new ApiError(404,'User not found')
+    }
+
     req.user = {
         id:decoded.id,
         role:decoded.role,
+        isBlocked:user.isBlocked
     }
 
     next();
