@@ -1,7 +1,7 @@
 import { Router } from "express";
-import cartControllers from "../controllers/cart.controllers.js";
 import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
+import cartControllers from "../controllers/cart.controllers.js";
 import authControllers from "../controllers/auth.controllers.js";
 const cartRouter = Router();
 

@@ -1,223 +1,366 @@
 # CAMPUS OUT
 
-A Node.js + Express API for user authentication, email verification, session-based token refresh, and vendor-managed restaurant/menu resources.
+Campus Out is a Node.js and Express REST API for a campus food ordering platform. It supports email-verified authentication, role-based access, vendor restaurant/menu management, user cart and order flows, reviews, and admin reporting.
 
-> **Status:** in progress. The core auth and restaurant flows are implemented, but the project is not complete yet and will continue to expand.
+> Status: in progress. The main backend workflows are implemented, but deployment hardening, complete test coverage, and full production documentation are still ongoing.
 
-## What is implemented now
+## Features
 
-- User registration with email verification
-- Login with JWT access tokens and refresh-token cookie sessions
-- Logout and logout-all-session support
-- Role-based access control for vendor routes
-- Restaurant CRUD-style endpoints for vendors
-- Menu item creation and retrieval for restaurants
-- Centralized validation, error handling, and API response helpers
+- Email-based user registration with OTP verification.
+- JWT access tokens with cookie-based refresh sessions.
+- Role-based access control for `user`, `vendor`, and `admin` roles.
+- Vendor restaurant management with owner-only updates and status controls.
+- Menu management with image upload support through Multer and Cloudinary.
+- User cart management with single-restaurant cart enforcement and recalculated totals.
+- Order creation from cart snapshots, user order history, cancellation, and vendor status updates.
+- Restaurant reviews from users who have delivered orders.
+- Automatic restaurant rating and review-count updates.
+- Admin dashboard metrics, including users, vendors, restaurants, orders, and delivered-order revenue.
+- Centralized API responses, error handling, async route wrapping, and validation helpers.
 
-## Core modules
-
-- **Auth**: registration, login, OTP verification, token refresh, and session logout
-- **Restaurant management**: create, update, view, delete, and toggle restaurant status
-- **Menu management**: create, fetch, update, toggle availability, and delete menu items
-- **Infrastructure**: MongoDB connection, request validation, error wrappers, and mail delivery
-
-## Data model overview
-
-- **User**: stores username, email, password hash, role, and verification state
-- **Session**: stores hashed refresh tokens and device metadata for logout/rotation
-- **OTP**: stores hashed verification codes for email confirmation
-- **Restaurant**: stores vendor-owned restaurant details and status
-- **Menu item**: stores restaurant-linked items such as name, price, category, and image
-
-## Tech stack
-
-- **Runtime:** Node.js
-- **Framework:** Express
-- **Database:** MongoDB with Mongoose
-- **Auth:** JSON Web Tokens, bcrypt, cookie-based refresh tokens
-- **Email:** Nodemailer
-- **Validation:** express-validator
-
-## Prerequisites
+## Tech Stack
 
 - Node.js
-- MongoDB instance
-- Gmail/OAuth email credentials for verification mail delivery
+- Express
+- MongoDB with Mongoose
+- JSON Web Tokens
+- bcrypt
+- cookie-parser
+- express-validator
+- Nodemailer
+- Multer
+- Cloudinary
+- Morgan
+- CORS
 
-## Environment variables
+## Project Structure
 
-The app validates these values on startup:
+```text
+src/
+  config/         Environment validation and database setup
+  controllers/    Route handler logic
+  middlewares/    Authentication, role checks, and upload handling
+  models/         Mongoose schemas
+  routes/         API route definitions
+  services/       Email and Cloudinary integrations
+  utils/          Shared helpers, API responses, errors, totals, ratings, and stats
+  validators/     Request validation rules
+```
+
+## Environment Variables
+
+The app validates required environment variables on startup.
 
 ```env
 PORT=3000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
+
 CLIENT_ID=your_google_oauth_client_id
 CLIENT_SECRET=your_google_oauth_client_secret
 GOOGLE_REFRESH_TOKEN=your_google_refresh_token
 GOOGLE_USER=your_gmail_address
+
+CLOUDINARY_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
-
-## Development notes
-
-- The server uses JSON request bodies and cookie-based refresh tokens.
-- Access tokens must be sent in the `Authorization` header as `Bearer <token>`.
-- Refresh cookies are marked `httpOnly`, `secure`, and `sameSite=strict`, so HTTPS is required in environments where the browser must persist the cookie.
-- Most restaurant and menu write operations are restricted to users with the `vendor` role.
-- Several routes also verify resource ownership before allowing updates or deletes.
 
 ## Setup
 
-1. Install dependencies
+1. Install dependencies.
 
    ```bash
    npm install
    ```
 
-2. Start the server
+2. Create a `.env` file with the variables listed above.
+
+3. Start the development server.
 
    ```bash
    npm run dev
    ```
 
-## API overview
+The Express app enables JSON request bodies, request logging, cookies, and CORS for `http://localhost:5173` with credentials enabled.
 
-### Auth
+## Authentication
 
 Base path: `/api/auth`
 
-- `POST /register`
-- `POST /login`
-- `POST /verify-email`
-- `POST /refresh-token`
-- `POST /logout`
-- `POST /logout-all`
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/register` | Register a user and send an OTP email. |
+| POST | `/verify-email` | Verify email with OTP and create a session. |
+| POST | `/login` | Log in and receive an access token. |
+| POST | `/refresh-token` | Rotate the refresh token and issue a new access token. |
+| POST | `/logout` | Revoke the current refresh-token session. |
+| POST | `/logout-all` | Revoke all active sessions for the user. |
 
-Expected request fields:
+Request bodies:
 
-- `POST /register`: `username`, `email`, `password`, optional `role`
-- `POST /login`: `email`, `password`
-- `POST /verify-email`: `email`, `otp`
+- `POST /register`: `username`, `email`, `password`, optional `role`.
+- `POST /verify-email`: `email`, `otp`.
+- `POST /login`: `email`, `password`.
 
-### Restaurants
+Use the access token on protected routes:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+Refresh tokens are stored in an `httpOnly` cookie named `refreshToken`. Current cookie settings are `secure: false` and `sameSite: lax` for local development.
+
+## Restaurants
 
 Base path: `/api`
 
-- `POST /restaurants` — vendor only
-- `PATCH /restaurants/:id` — vendor only
-- `GET /restaurants/my` — vendor only
-- `GET /restaurants/:id` — authenticated owner-only lookup
-- `DELETE /restaurants/:id` — vendor only
-- `PATCH /restaurants/:id/status` — vendor only
-- `GET /restaurants` — public listing of open restaurants
-- `GET /restaurant/:id` — public fetch of a single open restaurant by id
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/restaurants` | Vendor | Create a restaurant owned by the authenticated vendor. |
+| PATCH | `/restaurants/:id` | Vendor owner | Update allowed restaurant fields. |
+| GET | `/restaurants/my` | Vendor | Fetch restaurants owned by the authenticated vendor. |
+| GET | `/restaurants/:id` | Authenticated owner | Fetch a restaurant for its owner. |
+| DELETE | `/restaurants/:id` | Vendor owner | Delete a restaurant. |
+| PATCH | `/restaurants/:id/status` | Vendor owner | Update `isOpen`. |
+| GET | `/restaurants` | Public | List open restaurants. |
+| GET | `/restaurant/:id` | Public | Fetch one open restaurant. |
 
-Expected request fields and behavior:
+Create body:
 
-- `POST /restaurants`: creates a restaurant (vendor only). Body: `restaurantName`, `phone`, `description`, `location`, `category`.
-- `PATCH /restaurants/:id`: updates a restaurant (vendor only & owner-only). Accepts editable fields: `restaurantName`, `description`, `category`, `phone`, `email`, `logo`, `banner`, `location`, `deliveryTime`, `minimumOrder`, `isOpen`.
-- `GET /restaurants/my`: returns restaurants owned by the authenticated vendor.
-- `GET /restaurants/:id`: authenticated route that returns the restaurant only to its owner (vendor).
-- `DELETE /restaurants/:id`: deletes a restaurant (vendor only & owner-only).
-- `PATCH /restaurants/:id/status`: toggles open/closed (vendor only & owner-only). Body: `isOpen` (boolean).
-- `GET /restaurants`: public listing of open restaurants. Supports query params: `search` (partial name match), `page` (default 1), `limit` (default 10).
-- `GET /restaurant/:id`: public fetch of a single open restaurant by id — returns a limited projection (owner and `minimumOrder` omitted).
+```json
+{
+  "restaurantName": "Campus Cafe",
+  "phone": "9876543210",
+  "description": "Quick meals and snacks",
+  "location": "Main block",
+  "category": "Cafe"
+}
+```
 
-### Menu
+Public listing query parameters:
+
+- `search`: partial restaurant-name search.
+- `category`: filter by category.
+- `page`: page number, default `1`.
+- `limit`: page size, default `10`.
+
+Restaurant categories include `Fast Food`, `Cafe`, `Bakery`, `South Indian`, `North Indian`, `Chinese`, and `Other`.
+
+## Menu
 
 Base path: `/api/restaurants`
 
-- `POST /:restaurantId/menu` — vendor only
-- `GET /:restaurantId/menu`
-- `GET /menu/:id`
-- `PATCH /menu/:id` — vendor only
-- `PATCH /menu/:id/status` — vendor only
-- `DELETE /menu/:id` — vendor only
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/:restaurantId/menu` | Vendor owner | Create a menu item for a restaurant. |
+| GET | `/:restaurantId/menu` | Public | Fetch active menu items for a restaurant. |
+| GET | `/menu/:id` | Public | Fetch one non-deleted menu item. |
+| PATCH | `/menu/:id` | Vendor owner | Update allowed menu fields. |
+| PATCH | `/menu/:id/status` | Vendor owner | Update availability. |
+| DELETE | `/menu/:id` | Vendor owner | Soft delete a menu item. |
 
-Expected request fields:
+Menu creation uses `multipart/form-data` and requires an uploaded file field named `image`. The uploaded file is temporarily stored in `public/temp`, uploaded to Cloudinary, and saved as the menu item's image URL.
 
-- `POST /:restaurantId/menu`: `name`, `description`, `price`, `category`, `image`
-- `PATCH /menu/:id`: editable menu fields supported by the controller
-- `PATCH /menu/:id/status`: `isAvailable`
+Create fields:
 
-Notes:
+- `name`
+- `description`
+- `price`
+- `category`
+- `image`
 
-- Menu updates and deletes use ownership checks, so vendors can only manage their own menu items.
-- Deleting a menu item is soft delete; the item is marked deleted instead of being removed from the database.
+Status update body:
 
-### Cart
+```json
+{
+  "isAvailable": true
+}
+```
+
+Deleted menu items are marked with `isDeleted: true` instead of being removed from the database.
+
+## Cart
 
 Base path: `/api/user`
 
-- `POST /cart/items` — authenticated `user` only; adds items to the authenticated user's cart.
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/cart/items` | User | Add an item to the authenticated user's cart. |
+| GET | `/cart` | User | Fetch the authenticated user's cart. |
+| PATCH | `/cart/items/:menuItemId` | User | Update an item's quantity. |
+| DELETE | `/cart/items/:menuItemId` | User | Remove one item from the cart. |
+| DELETE | `/cart` | User | Clear the entire cart. |
 
-Behavior and request fields:
+Add/update body:
 
-- Routes:
-  - `POST /cart/items` — adds items to the authenticated user's cart (returns `201 Created`).
-  - `GET /cart/items` — fetches the authenticated user's cart (returns `200 OK`).
-  - `PATCH /cart/items/:menuItemId` — updates an item's quantity in the cart (returns `200 OK`).
-  - `DELETE /cart/items/:menuItemId` — removes a single item from the cart (returns `200 OK`).
-  - `DELETE /cart` — deletes the authenticated user's entire cart (returns `200 OK`).
-
-- Request body for add/update: `menuItemId` (ObjectId), `quantity` (number, >= 1).
-- Validation and errors:
-  - `menuItemId` must be a valid MongoDB ObjectId — otherwise `400 Bad Request`.
-  - `quantity` must be >= 1 — otherwise `400 Bad Request`.
-  - Adding items from different restaurants returns `409 Conflict`.
-  - If a referenced menu item no longer exists or is unavailable, requests will fail with `400`.
-
-- Behavior details:
-  - A `cartTotal` utility is used by the controllers to recompute and persist `totalAmount` after add, update, and delete operations. Totals are computed from the current `menu.price` values.
-  - If the user has no existing cart, a new cart is created on first add with the `restaurant` set to the added item's restaurant.
-  - When deleting an item, if it was the last item in the cart the cart document is removed and the API responds with an empty cart (restaurant `null`, empty `items`, `totalAmount: 0`).
-  - `GET /cart/items` populates the `restaurant` (selecting `restaurantName`) and each `items.menuItem` (selecting `name`, `price`, `image`). The controller filters out any items whose referenced `menuItem` no longer exists before returning results and recalculates `totalAmount`.
-
-Model summary (`Cart`):
-
-- `user`: ObjectId (ref `User`, unique) — owner of the cart.
-- `restaurant`: ObjectId (ref `Restaurant`) — restaurant associated with the cart items.
-- `items`: array of `{ menuItem: ObjectId (ref `Menu`), quantity: Number }`.
-- `totalAmount`: Number — computed total for the cart and persisted after changes.
-
-## Authentication flow
-
-- Register with `username`, `email`, and `password`
-- Verify the account with the OTP sent by email
-- Log in to receive an access token
-- Send the access token as:
-
-  ```http
-  Authorization: Bearer <accessToken>
-  ```
-
-- Refresh tokens are stored in an `httpOnly` cookie
-
-## Current limitations
-
-- The project is still under active development.
-- There are no automated tests yet.
-- API documentation is intentionally lightweight and will expand as more features are added.
-- Production deployment settings, observability, and hardening are not finished.
-
-## Project structure
-
-```text
-src/
-  config/         environment and database setup
-  controllers/    route handlers
-  middlewares/    auth and role guards
-  models/         Mongoose schemas
-  routes/         API route definitions
-  services/       email delivery
-  utils/          shared helpers and response/error wrappers
-  validators/     request validation rules
+```json
+{
+  "menuItemId": "mongo_object_id",
+  "quantity": 2
+}
 ```
 
-## Planned next steps
+Cart behavior:
 
-- Expand restaurant and menu management features
-- Add more user-facing flows and profile management
-- Improve documentation and examples as the API grows
-- Add tests and deployment-ready configuration
+- A user can have one active cart.
+- Cart items must belong to the same restaurant.
+- Totals are recalculated from current menu prices after add, update, and delete operations.
+- If the last item is removed, the cart document is deleted and an empty cart response is returned.
+- Cart responses populate restaurant name and menu item details where available.
 
+## Orders
+
+Base path: `/api/user`
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/order` | User | Create an order from the user's cart. |
+| GET | `/orders/my` | User | Fetch the user's order history. |
+| GET | `/orders/:orderId` | User owner | Fetch one order. |
+| PATCH | `/orders/:orderId/cancel` | User owner | Cancel a pending order. |
+| GET | `/order/restaurant` | Vendor | Fetch orders for the vendor's restaurant. |
+| PATCH | `/order/:orderId/status` | Vendor owner | Update an order status. |
+
+Create order body:
+
+```json
+{
+  "paymentMethod": "COD"
+}
+```
+
+Supported payment methods:
+
+- `COD`
+- `PAY_ON_PICKUP`
+
+Order statuses:
+
+- `PENDING`
+- `CONFIRMED`
+- `PREPARING`
+- `READY`
+- `DELIVERED`
+- `CANCELLED`
+
+Order behavior:
+
+- Orders are created from the current cart.
+- Each order stores a snapshot of item name, purchase price, and quantity.
+- The cart is deleted after a successful order.
+- Users can cancel only `PENDING` orders.
+- Vendors can update orders for their own restaurant to `CONFIRMED`, `PREPARING`, `READY`, or `DELIVERED`.
+- Delivered orders cannot be changed again.
+- Order history and vendor order listing support `page` and `limit` query parameters.
+
+## Reviews
+
+Base path: `/api/user`
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| POST | `/reviews/:restaurantId` | User | Create a review for a restaurant. |
+| GET | `/restaurants/:restaurantId/reviews` | Public | Fetch restaurant reviews. |
+| PATCH | `/reviews/:reviewId` | User owner | Update a review. |
+| DELETE | `/reviews/:reviewId` | User owner | Delete a review. |
+
+Create/update body:
+
+```json
+{
+  "rating": 5,
+  "comment": "Great food and quick service."
+}
+```
+
+Review behavior:
+
+- Ratings must be between `1` and `5`.
+- Users can review a restaurant only after having a `DELIVERED` order for it.
+- Each user can review a restaurant only once.
+- Updating or deleting a review recalculates the restaurant's `averageRating` and `reviewCount`.
+- Review listing includes pagination and returns the restaurant rating summary.
+
+## Admin
+
+Base path: `/api/admin`
+
+All admin routes require authentication and the `admin` role.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/dashboard` | Fetch dashboard metrics. |
+| GET | `/dashboard/users` | List users with search and pagination. |
+| GET | `/dashboard/vendors` | List vendors with search and pagination. |
+| GET | `/dashboard/restaurants` | List restaurants with filters and pagination. |
+
+Dashboard metrics:
+
+- `userCount`
+- `vendorCount`
+- `restaurantCount`
+- `orderCount`
+- `revenue`
+
+Revenue is calculated from orders where `orderStatus` is `DELIVERED` by summing `totalAmount`.
+
+Admin query parameters:
+
+- Users/vendors: `search`, `page`, `limit`.
+- Restaurants: `search`, `category`, `isOpen`, `page`, `limit`.
+
+## Data Models
+
+- `User`: username, email, password hash, verification state, and role.
+- `Session`: hashed refresh token, user, IP, user agent, and revoked state.
+- `OTP`: hashed email verification code with expiry behavior.
+- `Restaurant`: vendor owner, profile details, category, status, rating average, and review count.
+- `Menu`: restaurant, item details, price, availability, soft-delete state, and image URL.
+- `Cart`: one cart per user with restaurant, items, quantities, and persisted total.
+- `Order`: user, restaurant, item snapshots, total amount, payment method/status, order status, and order number.
+- `Review`: user, restaurant, rating, comment, and uniqueness across user plus restaurant.
+
+## Shared Utilities
+
+- `ApiError`: standard error object with status codes and optional validation errors.
+- `ApiResponse`: consistent JSON response wrapper.
+- `asyncHandler`: wraps async controllers and forwards errors.
+- `cartTotal`: recalculates cart totals from menu prices.
+- `menuOwnership`: checks that a vendor owns the menu item's restaurant.
+- `orderNumber`: generates readable unique order numbers.
+- `revenueStats`: calculates delivered-order revenue for admin dashboard data.
+- `updateRestaurantReview`: recalculates restaurant average rating and review count.
+- `utils`: OTP generation and OTP email template helpers.
+
+## API Response Shape
+
+Most successful responses use the shared response helper:
+
+```json
+{
+  "statusCode": 200,
+  "message": "Operation successful",
+  "data": {},
+  "success": true
+}
+```
+
+Errors are handled centrally:
+
+```json
+{
+  "statusCode": 400,
+  "data": null,
+  "message": "Validation failed",
+  "success": false,
+  "errors": []
+}
+```
+
+## Current Limitations
+
+- The project is still under active development.
+- There is no dedicated production start script yet.
+- Automated test coverage and API examples can be expanded further.
+- Production cookie, CORS, logging, monitoring, and deployment settings still need final hardening.
