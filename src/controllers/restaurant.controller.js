@@ -16,7 +16,7 @@ const createRestaurant = asyncHandler(async (req, res) => {
     })
 
     if (!newRestaurant) {
-        throw new ApiError("Failed to create restaurant", 500);
+        throw new ApiError(500,"Failed to create restaurant");
     }
 
     return res.status(201).json(new ApiResponse(201, "Restaurant created successfully", newRestaurant));

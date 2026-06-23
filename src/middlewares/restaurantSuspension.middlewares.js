@@ -3,7 +3,7 @@ import ApiError from "../utils/apiErrors.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
 const restaurantSuspensionMiddleware = asyncHandler(async(req,res,next)=>{
-    const userId = req.user.Id
+    const userId = req.user.id
     const restaurant = await restaurantModel.findOne({
         owner:userId
     })

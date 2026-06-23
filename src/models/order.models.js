@@ -63,6 +63,7 @@ const orderSchema = new mongoose.Schema({
             "CONFIRMED",
             "PREPARING",
             "READY",
+            "OUT_FOR_DELIVERY",
             "DELIVERED",
             "CANCELLED"
         ],
@@ -72,6 +73,11 @@ const orderSchema = new mongoose.Schema({
         type:String,
         required:true,
         unique:true
+    },
+    deliveryPartner:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'DeliveryPartner',
+        default:null
     }
 
 },{
