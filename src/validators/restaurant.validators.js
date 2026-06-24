@@ -32,5 +32,11 @@ const restaurantValidationRules = [
     validateResult
 
 ]
+const restaurantStatusValidationRule = [
+    body('isOpen')
+        .isBoolean()
+        .withMessage('Input must be a boolean'),
+    validateResult
+]
 
-export { restaurantValidationRules }
+export { restaurantValidationRules,restaurantStatusValidationRule }

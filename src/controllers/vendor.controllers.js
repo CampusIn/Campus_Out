@@ -90,7 +90,7 @@ const revenueStatsPerWeek = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Restaurant not found')
     }
 
-    const revenueStats = revenuePerDayPipeline(restaurant._id)
+    const revenueStats = await revenuePerDayPipeline(restaurant._id)
     return res.status(200).json(new ApiResponse(200, 'Revenue Stats fetched successfully', revenueStats))
 });
 

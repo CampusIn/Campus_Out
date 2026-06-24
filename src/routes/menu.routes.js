@@ -16,7 +16,7 @@ menuRouter.get('/:restaurantId/menu', menuController.getRestaurantMenu);
 
 menuRouter.get('/menu/:id', menuController.getMenuItemById);
 
-menuRouter.patch('/menu/:id', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, menuUpdateValidationRules, menuController.updateMenuItem);
+menuRouter.patch('/menu/:id', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, upload.single('image'), menuUpdateValidationRules, menuController.updateMenuItem);
 
 menuRouter.patch('/menu/:id/status', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, menuStatusValidationRule, menuController.updateMenuStatus);
 

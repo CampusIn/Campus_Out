@@ -128,7 +128,11 @@ const getSingleOrder = asyncHandler(async (req, res) => {
 
     const order = await orderModel
         .findById(orderId)
-        .select("user orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount createdAt")
+        .select("user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount createdAt")
+        .populate({
+            path: 'items.menuItem',
+            select: 'image'
+        })
     if (!order) {
         throw new ApiError(404, "Order not found")
     }

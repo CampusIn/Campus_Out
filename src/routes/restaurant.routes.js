@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import restaurantController from '../controllers/restaurant.controller.js';
-import { restaurantValidationRules } from '../validators/restaurant.validators.js';
+import { restaurantValidationRules,restaurantStatusValidationRule } from '../validators/restaurant.validators.js';
 import { authMiddleware } from '../middlewares/auth.middlewares.js';
 import { blockMiddleware } from '../middlewares/block.middlewares.js'
 import roleMiddleware from '../middlewares/role.middleware.js';
@@ -17,7 +17,7 @@ restaurantRoute.get('/restaurants/:id', authMiddleware, restaurantController.get
 
 restaurantRoute.delete('/restaurants/:id', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantController.dltRestaurantById);
 
-restaurantRoute.patch('/restaurants/:id/status', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, restaurantValidationRules, restaurantController.updateRestaurantStatus);
+restaurantRoute.patch('/restaurants/:id/status', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, restaurantStatusValidationRule, restaurantController.updateRestaurantStatus);
 
 restaurantRoute.get('/restaurants', restaurantController.getAllRestaurantsByUser);
 

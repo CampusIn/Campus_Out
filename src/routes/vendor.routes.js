@@ -3,6 +3,7 @@ import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
 import vendorControllers from "../controllers/vendor.controllers.js";
 import { blockMiddleware } from "../middlewares/block.middlewares.js";
+import upload from "../middlewares/multer.middlewares.js"
 
 const vendorRoute = Router()
 
