@@ -20,7 +20,10 @@ const createMenuItem = asyncHandler(async (req, res) => {
     if (restaurant.owner.toString() !== req.user.id.toString()) {
         throw new ApiError(403, "Forbidden")
     }
-    const { name, description, price, category } = req.body
+    const { name, description, price, category, mrp } = req.body
+    if(mrp<price){
+        throw new ApiError(400,'MRP cannot be less than price')
+    }
     const imageLocalPath = req.file?.path
     if (!imageLocalPath) {
         throw new ApiError(400, "Menu image is required")
@@ -28,12 +31,14 @@ const createMenuItem = asyncHandler(async (req, res) => {
     const imageUrl = await uploadOnCloudinary(
         imageLocalPath
     )
+
     const menuCreated = await menuModel.create({
         restaurant: restaurantId,
         name,
         description,
         price,
         category,
+        mrp,
         image:imageUrl
     })
     return res.status(201).json(new ApiResponse(201, menuCreated, "Menu item created successfully"))

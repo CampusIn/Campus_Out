@@ -20,6 +20,11 @@ const menuItemSchema = new mongoose.Schema({
         required:[true,"Price is required"],
         min:0
     },
+    mrp:{
+        type:Number,
+        required:[true,"MRP is required"],
+        min:0
+    },
     category:{
         type:String,
         required:[true,"Category is required"]
@@ -35,6 +40,14 @@ const menuItemSchema = new mongoose.Schema({
     image:{
         type:String,
         default:""
+    },
+    stockQty:{
+        type:Number,
+        default:0
+    },
+    lowStockThreshold:{
+        type:Number,
+        default:5
     }
 },{
     timestamps:true
