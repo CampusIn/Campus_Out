@@ -4,6 +4,7 @@ import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
 import settingsValidatorsRules from "../validators/settings.validators.js";
 import couponValidationRules from "../validators/coupon.validators.js";
+import couponUpdateValidationRules from "../validators/couponUpdate.validators.js";
 
 const adminRouter = Router();
 
@@ -35,7 +36,11 @@ adminRouter.post('/coupons',authMiddleware,roleMiddleware('admin'),couponValidat
 
 adminRouter.get('/coupons',authMiddleware,roleMiddleware('admin'),adminController.getAllCoupons);
 
-adminRouter.get('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),adminController.getCouponById)
+adminRouter.get('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),adminController.getCouponById);
+
+adminRouter.patch('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),couponUpdateValidationRules,adminController.updateCoupon);
+
+adminRouter.patch('/coupons/:couponId/status',authMiddleware,roleMiddleware('admin'),adminController.updateCouponStatus)
 
 
 export default adminRouter

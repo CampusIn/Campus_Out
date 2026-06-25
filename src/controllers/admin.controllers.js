@@ -370,7 +370,7 @@ const createCoupons = asyncHandler(async (req, res) => {
     }
 
     const expiry = new Date(expiryDate)
-    if(expiry<new Date()){
+    if(expiry<=new Date()){
         throw new ApiError(400,'Coupon already expired')
     }
 
@@ -500,6 +500,75 @@ const getCouponById = asyncHandler(async(req,res)=>{
 
 });
 
+const updateCoupon = asyncHandler(async(req,res)=>{
+    const{couponId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(couponId)){
+        throw new ApiError(400,'Invalid coupon ID`')
+    }
+
+    const coupon = await couponModel.findById(couponId)
+    if(!coupon){
+        throw new ApiError(404,'Coupon not found')
+    }
+
+    const updates = req.body
+
+    if(updates.code){
+        const normalisedCode = updates.code.trim().toUpperCase()
+        const isExisting = await couponModel.findOne({
+            code:normalisedCode,
+            _id:{$ne:couponId}
+        })
+
+        if(isExisting){
+            throw new ApiError(409,'Coupon already exists')
+        }
+    }
+
+    Object.entries(updates).forEach(([key,value])=>{
+        if(value !== undefined){
+            coupon[key] = value
+        }
+    })
+
+    const expiry =new Date(coupon.expiryDate)
+    if(expiry <= new Date()){
+        throw new ApiError(400,'Coupon already expired')
+    }
+
+    if(coupon.discountType === 'PERCENTAGE'){
+        if(coupon.discountValue > 100) throw new ApiError(400,'Discount value cannot be greater than 100')
+        
+        if(coupon.maximumDiscount < 1) throw new ApiError(400,'Maximum discount anount should be greater than 0')
+    }else if(coupon.discountType === 'FIXED'){
+        coupon.maximumDiscount = 0
+    }
+
+    await coupon.save()
+
+    return res.status(200).json(new ApiResponse(200,'Coupon updated successfully',coupon))
+
+    
+});
+
+const updateCouponStatus = asyncHandler(async(req,res)=>{
+    const{couponId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(couponId)){
+        throw new ApiError(400,'Coupon ID is invalid')
+    }
+    const coupon = await couponModel.findById(couponId)
+    if(!coupon){
+        throw new ApiError(404,'Coupon is not existing')
+    }
+
+    coupon.isActive = !coupon.isActive
+    await coupon.save()
+
+    return res.status(200).json(new ApiResponse(200,'Coupon status updated successfully',{
+        'currentCouponState':coupon.isActive
+    }))
+})
+
 
 
 
@@ -518,5 +587,7 @@ export default {
     editSettings,
     createCoupons,
     getAllCoupons,
-    getCouponById
+    getCouponById,
+    updateCoupon,
+    updateCouponStatus
 }
