@@ -2,6 +2,8 @@ import { Router } from "express";
 import adminController from "../controllers/admin.controllers.js";
 import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
+import settingsValidatorsRules from "../validators/settings.validators.js";
+import couponValidationRules from "../validators/coupon.validators.js";
 
 const adminRouter = Router();
 
@@ -24,5 +26,16 @@ adminRouter.patch('/restaurants/:id/activate',authMiddleware,roleMiddleware('adm
 adminRouter.get('/orders',authMiddleware,roleMiddleware('admin'),adminController.getAllOrders);
 
 adminRouter.get('/orders/:id',authMiddleware,roleMiddleware('admin'),adminController.getOrderById);
+
+adminRouter.get('/settings',authMiddleware,roleMiddleware('admin'),adminController.configSettings);
+
+adminRouter.patch('/settings',authMiddleware,roleMiddleware('admin'),settingsValidatorsRules,adminController.editSettings);
+
+adminRouter.post('/coupons',authMiddleware,roleMiddleware('admin'),couponValidationRules,adminController.createCoupons);
+
+adminRouter.get('/coupons',authMiddleware,roleMiddleware('admin'),adminController.getAllCoupons);
+
+adminRouter.get('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),adminController.getCouponById)
+
 
 export default adminRouter

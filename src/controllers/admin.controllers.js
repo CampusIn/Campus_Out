@@ -5,7 +5,10 @@ import userModel from "../models/user.models.js";
 import restaurantModel from "../models/restaurant.models.js";
 import orderModel from "../models/order.models.js";
 import getRevenueStats from "../utils/revenueStats.utils.js";
+import platformSettingsModel from "../models/platformSettings.models.js";
+import couponModel from "../models/coupon.models.js";
 import mongoose from "mongoose";
+
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
     const [
@@ -290,30 +293,213 @@ const getAllOrders = asyncHandler(async (req, res) => {
     }))
 });
 
-const getOrderById = asyncHandler(async(req,res) =>{
+const getOrderById = asyncHandler(async (req, res) => {
     const orderId = req.params.id
-    if(!mongoose.Types.ObjectId.isValid(orderId)){
-        throw new ApiError(400,'Invalid OrderID')
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+        throw new ApiError(400, 'Invalid OrderID')
     }
 
     const order = await orderModel
         .findById(orderId)
         .populate([
             {
-            path:'user',
-            select:'username'
-        },
-        {
-            path:'items.menuItem',
-            select:'name price image'
-        }
-    ])
-    if(!order){
-        throw new ApiError(404,'Order not found')
+                path: 'user',
+                select: 'username'
+            },
+            {
+                path: 'items.menuItem',
+                select: 'name price image'
+            }
+        ])
+    if (!order) {
+        throw new ApiError(404, 'Order not found')
     }
 
-    return res.status(200).json(new ApiResponse(200,'Order fetched successfully',{order}))
-})
+    return res.status(200).json(new ApiResponse(200, 'Order fetched successfully', { order }))
+});
+
+const configSettings = asyncHandler(async (req, res) => {
+    let settings = await platformSettingsModel.findOne()
+    if (!settings) {
+        settings = await platformSettingsModel.create({})
+    }
+
+    return res.status(200).json(new ApiResponse('Settings configured successfully', settings))
+});
+
+const editSettings = asyncHandler(async (req, res) => {
+    const settings = await platformSettingsModel.findOne()
+    if (!settings) {
+        throw new ApiError(404, 'Platform settings not found')
+    }
+
+    const updates = req.body
+
+
+    Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+            settings[key] = value;
+        }
+    });
+
+    if (settings.freeDeliveryAbove < settings.minimumOrderValue) {
+        throw new ApiError(400, 'Minimum order value cannot be above free delivery order value')
+    }
+
+    settings.updatedBy = req.user.id
+    await settings.save()
+
+    return res.status(200).json(new ApiResponse(200, 'Settings updated successfully', settings))
+});
+
+const createCoupons = asyncHandler(async (req, res) => {
+    let {
+        code,
+        discountType,
+        discountValue,
+        minimumOrderValue,
+        maximumDiscount,
+        expiryDate,
+        usageLimit
+    } = req.body
+
+    const normalisedCode = code.trim().toUpperCase()
+    const isExisting = await couponModel.findOne({code:normalisedCode})
+    if(isExisting){
+        throw new ApiError(409,'Coupon already exists')
+    }
+
+    const expiry = new Date(expiryDate)
+    if(expiry<new Date()){
+        throw new ApiError(400,'Coupon already expired')
+    }
+
+
+    if(discountType==='PERCENTAGE' && maximumDiscount<=0){
+        throw new ApiError(400,'Maximum discount is required for percentage coupons')
+    }
+    if(discountType === 'PERCENTAGE'){
+        if(discountValue>100){
+            throw new ApiError(400,'Percentage cannot exceed 100%')
+        }
+    }else if(discountType === 'FIXED'){
+        maximumDiscount = 0
+    }
+
+
+    const coupon = await couponModel.create({
+        normalisedCode,
+        discountType,
+        discountValue,
+        minimumOrderValue,
+        maximumDiscount,
+        expiryDate,
+        usageLimit,
+        createdBy:req.user.id
+    })
+
+    return res.status(201).json(new ApiResponse(201,'Coupon created successfully',coupon))
+});
+
+const getAllCoupons = asyncHandler(async(req,res)=>{
+    const{
+        search,
+        isActive,
+        discountType,
+        page = 1,
+        limit = 5
+    } = req.query
+
+    const pageNumber = parseInt(page) || 1
+    const limitNumber = parseInt(limit) || 5
+    if(pageNumber<1 || limitNumber<1){
+        throw new ApiError(400,'Page or limit number cannot be less than 1')
+    }
+
+    const skip = (pageNumber - 1)*limitNumber
+    let filter = {}
+    if(search){
+        filter.code={
+            $regex:search,
+            $options:'i'
+        }
+    }
+
+    if(isActive === 'true'){
+        filter.isActive = true
+    }else if(isActive === 'false'){
+        filter.isActive = false
+    }
+
+    const allowedTypes = ['PERCENTAGE','FIXED']
+
+    if(discountType){
+        if(!discountType.includes(allowedTypes)){
+            throw new ApiError(400,'Invalid discount type')
+        }
+        filter.discountType = discountType
+    }
+
+    const [coupons, totalCoupons] = await Promise.all([
+        couponModel
+            .find(filter)
+            .sort({createdAt:-1})
+            .skip(skip)
+            .limit(limitNumber)
+            .populate({
+                path:'createdBy',
+                select:'username'
+            }),
+
+        couponModel.countDocuments(filter)
+
+    ])
+
+    const totalPages = Math.ceil(totalCoupons/limitNumber)
+
+    if(coupons.length === 0 ){
+        return res.status(200).json(new ApiResponse(200,'No coupons to fetch',{
+            coupons,
+            'pagination':{
+                'page':pageNumber,
+                'limit':limitNumber,
+                totalCoupons,
+                totalPages
+            }
+        }))
+    }
+
+    return res.status(200).json(new ApiResponse(200,'Coupons fetched successfully',{
+        coupons,
+        'pagination':{
+            'page':pageNumber,
+            'limit':limitNumber,
+            totalCoupons,
+            totalPages
+        }
+    }))
+});
+
+const getCouponById = asyncHandler(async(req,res)=>{
+    const {couponId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(couponId)){
+        throw new ApiError(400,'Invalid coupon ID')
+    }
+
+    const coupon = await couponModel
+        .findById(couponId)
+        .populate({
+            path:'createdBy',
+            select:'username'
+        })
+    if(!coupon){
+        throw new ApiError(404,'Coupon not found')
+    }
+
+    return res.status(200).json(new ApiResponse(200,'Coupon fetched successfully',coupon))
+
+});
+
 
 
 
@@ -327,5 +513,10 @@ export default {
     suspendRestaurant,
     activateRestaurant,
     getAllOrders,
-    getOrderById
+    getOrderById,
+    configSettings,
+    editSettings,
+    createCoupons,
+    getAllCoupons,
+    getCouponById
 }
