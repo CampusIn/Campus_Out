@@ -9,7 +9,8 @@ import platformSettingsModel from "../models/platformSettings.models.js";
 import couponModel from "../models/coupon.models.js";
 import mongoose from "mongoose";
 import announcementModel from "../models/anouncement.models.js";
-
+import bannerModel from "../models/banners.models.js";
+import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
     const [
@@ -214,7 +215,8 @@ const suspendRestaurant = asyncHandler(async (req, res) => {
     }
 
     const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
-        isSuspended: true
+        isSuspended: true,
+        isOpen: false
     })
 
     if (!restaurant) {
@@ -231,7 +233,8 @@ const activateRestaurant = asyncHandler(async (req, res) => {
     }
 
     const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
-        isSuspended: false
+        isSuspended: false,
+        isOpen: true
     })
 
     if (!restaurant) {
@@ -389,7 +392,7 @@ const createCoupons = asyncHandler(async (req, res) => {
 
 
     const coupon = await couponModel.create({
-        normalisedCode,
+        code: normalisedCode,
         discountType,
         discountValue,
         minimumOrderValue,
@@ -609,8 +612,8 @@ const getAnnouncements = asyncHandler(async (req, res) => {
     let filter = {}
     if (search) {
         filter.title = {
-            $regex:search,
-            $options:"i"
+            $regex: search,
+            $options: "i"
         }
     }
 
@@ -629,8 +632,8 @@ const getAnnouncements = asyncHandler(async (req, res) => {
             .skip(skip)
             .limit(limitNumber)
             .populate({
-                path:'createdBy',
-                select:'username'
+                path: 'createdBy',
+                select: 'username'
             }),
 
         announcementModel.countDocuments(filter)
@@ -664,74 +667,253 @@ const getAnnouncements = asyncHandler(async (req, res) => {
 
 });
 
-const getAnnouncementById = asyncHandler(async(req,res)=>{
-    const {announcementId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(announcementId)){
-        throw new ApiError(400,'Announcement ID is invalid')
+const getAnnouncementById = asyncHandler(async (req, res) => {
+    const { announcementId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+        throw new ApiError(400, 'Announcement ID is invalid')
     }
 
     const announcement = await announcementModel
         .findById(announcementId)
         .populate({
-            path:'createdBy',
-            select:'username'
+            path: 'createdBy',
+            select: 'username'
         })
-    if(!announcement){
-        throw new ApiError(404,'Announcement not found')
+    if (!announcement) {
+        throw new ApiError(404, 'Announcement not found')
     }
 
-    return res.status(200).json(new ApiResponse(200,'Announcement fetched successfully',announcement))
+    return res.status(200).json(new ApiResponse(200, 'Announcement fetched successfully', announcement))
 });
 
-const updateAnnouncement = asyncHandler(async(req,res)=>{
-    const{announcementId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(announcementId)){
-        throw new ApiError(400,'Invalid announcement ID')
+const updateAnnouncement = asyncHandler(async (req, res) => {
+    const { announcementId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+        throw new ApiError(400, 'Invalid announcement ID')
     }
 
     const announcement = await announcementModel.findById(announcementId)
-    if(!announcement){
-        throw new ApiError(404,'Announcement not found')
+    if (!announcement) {
+        throw new ApiError(404, 'Announcement not found')
     }
 
     const updates = req.body
-    Object.entries(updates).forEach(([key,value])=>{
-        if(value!==undefined)
+    Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined)
             announcement[key] = value
     })
 
-    if(updates.expiresAt){
+    if (updates.expiresAt) {
         const expiry = new Date(updates.expiresAt)
-        if(expiry <= new Date()){
-            throw new ApiError(400,'Expiry date must be in future')
+        if (expiry <= new Date()) {
+            throw new ApiError(400, 'Expiry date must be in future')
         }
     }
 
-    if(updates.priority !== undefined){
-        if(updates.priority<1)
-            throw new ApiError(400,'Priority cannot be less than 1')
+    if (updates.priority !== undefined) {
+        if (updates.priority < 1)
+            throw new ApiError(400, 'Priority cannot be less than 1')
     }
 
     await announcement.save()
 
-    return res.status(200).json(new ApiResponse(200,'Announcement updated successfully',announcement))
+    return res.status(200).json(new ApiResponse(200, 'Announcement updated successfully', announcement))
 });
 
-const updateAnnouncementStatus = asyncHandler(async(req,res)=>{
-    const{announcementId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(announcementId)){
-        throw new ApiError(400,'Invalid announcement ID')
+const updateAnnouncementStatus = asyncHandler(async (req, res) => {
+    const { announcementId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+        throw new ApiError(400, 'Invalid announcement ID')
     }
 
     const announcement = await announcementModel.findById(announcementId)
-    if(!announcement){
-        throw new ApiError(404,'Announcement not found')
+    if (!announcement) {
+        throw new ApiError(404, 'Announcement not found')
     }
 
     announcement.isActive = !announcement.isActive
     await announcement.save()
 
-    return res.status(200).json(new ApiResponse(200,'Announcement status updated successfully',announcement.isActive))
+    return res.status(200).json(new ApiResponse(200, 'Announcement status updated successfully', announcement.isActive))
+});
+
+const createBanner = asyncHandler(async (req, res) => {
+    const {
+        title,
+        priority,
+        redirectType,
+        redirectedId
+    } = req.body
+
+    if (redirectType !== 'NONE' && !redirectedId) {
+        throw new ApiError(400, 'Redirect ID is required')
+    }
+
+    const imageLocalPath = req.file?.path
+    if (!imageLocalPath) {
+        throw new ApiError(400, "Menu image is required")
+    }
+
+    const imageUrl = await uploadOnCloudinary(
+        imageLocalPath
+    )
+
+    const banner = await bannerModel.create({
+        title,
+        priority,
+        redirectType,
+        redirectedId,
+        image: imageUrl,
+        createdBy: req.user.id
+    })
+
+    return res.status(201).json(new ApiResponse(201, 'Banner created successfully', banner))
+});
+
+const getAllBanners = asyncHandler(async (req, res) => {
+    const {
+        search,
+        isActive,
+        page = 1,
+        limit = 5
+    } = req.query
+
+    const pageNumber = parseInt(page) || 1
+    const limitNumber = parseInt(limit) || 5
+    if (pageNumber < 1 || limitNumber < 1) {
+        throw new ApiError(400, 'Page or limit number cannot be less than 1')
+    }
+
+    const skip = (pageNumber - 1) * limitNumber
+    let filter = {}
+    if (search) {
+        filter.title = {
+            $regex: search,
+            $options: 'i'
+        }
+    }
+
+    if (isActive === 'true') {
+        filter.isActive = true
+    } else if (isActive === 'false') {
+        filter.isActive = false
+    }
+
+    const [banners, totalBanners] = await Promise.all([
+        bannerModel
+            .find(filter)
+            .sort({
+                priority: -1,
+                createdAt: -1
+            })
+            .skip(skip)
+            .limit(limitNumber)
+            .populate({
+                path: 'createdBy',
+                select: 'username'
+            }),
+
+        bannerModel.countDocuments(filter)
+    ])
+
+    const totalPages = Math.ceil(totalBanners / limitNumber)
+    if (banners.length === 0) {
+        return res.status(200).json(new ApiResponse(200, 'No banners to show', {
+            banners,
+            'pagination': {
+                'page': pageNumber,
+                'limit': limitNumber,
+                totalBanners,
+                totalPages,
+
+            }
+        }))
+    }
+
+     return res.status(200).json(new ApiResponse(200, 'Banners fetched successfully', {
+            banners,
+            'pagination': {
+                'page': pageNumber,
+                'limit': limitNumber,
+                totalBanners,
+                totalPages,
+
+            }
+        }))
+});
+
+const getBannerById = asyncHandler(async(req,res)=>{
+    const {bannerId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(bannerId)){
+        throw new ApiError(400,'Banner ID is invalid')
+    }
+
+    const banner = await bannerModel
+        .findById(bannerId)
+        .populate({
+            path:'createdBy',
+            select:'username'
+        })
+    if(!banner){
+        throw new ApiError(404,'Banner not found')
+    }
+
+    return res.status(200).json(new ApiResponse(200,'Banner fetched successfully',banner))
+
+
+});
+
+const updateBanner = asyncHandler(async(req,res)=>{
+    const {bannerId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(bannerId)){
+        throw new ApiError(400,'Banner ID is invalid')
+    }
+
+    const banner = await bannerModel.findById(bannerId)
+    if(!banner){
+        throw new ApiError(404,'Banner not found')
+    }
+
+    const updates = req.body
+    Object.entries(updates).forEach(([key,value])=>{
+        if(value!==undefined){
+            banner[key] = value
+        }
+    })
+
+    const imageLocalPath = req.file?.path
+    if(!imageLocalPath){
+        if(updates.redirectType!=='NONE' && !updates.redirectedId){
+            throw new ApiError(400, 'Redirect ID is required')
+        }
+        await banner.save()
+        return res.status(200).json(new ApiResponse(200,'Banner updated successfully',banner))
+    }
+
+    if(updates.redirectType!=='NONE' && !updates.redirectedId){
+            throw new ApiError(400, 'Redirect ID is required')
+        }
+
+    const imageUrl = await uploadOnCloudinary(imageLocalPath)
+    banner.image = imageUrl
+    await banner.save()
+    return res.status(200).json(new ApiResponse(200,'Banner updated successfully',banner))
+});
+
+const updateBannerStatus = asyncHandler(async(req,res)=>{
+    const {bannerId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(bannerId)){
+        throw new ApiError(400,'Banner ID is invalid')
+    }
+    const banner = await bannerModel.findById(bannerId)
+    if(!banner){
+        throw new ApiError(404,'Banner not found')
+    }
+
+    banner.isActive = !banner.isActive
+    await banner.save()
+
+    return res.status(200).json(new ApiError(200,'Banner status updated successfully',banner.isActive))
 })
 
 
@@ -759,5 +941,10 @@ export default {
     getAnnouncements,
     getAnnouncementById,
     updateAnnouncement,
-    updateAnnouncementStatus
+    updateAnnouncementStatus,
+    createBanner,
+    getAllBanners,
+    getBannerById,
+    updateBanner,
+    updateBannerStatus
 }
