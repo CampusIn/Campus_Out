@@ -8,6 +8,7 @@ import getRevenueStats from "../utils/revenueStats.utils.js";
 import platformSettingsModel from "../models/platformSettings.models.js";
 import couponModel from "../models/coupon.models.js";
 import mongoose from "mongoose";
+import announcementModel from "../models/anouncement.models.js";
 
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
@@ -364,25 +365,25 @@ const createCoupons = asyncHandler(async (req, res) => {
     } = req.body
 
     const normalisedCode = code.trim().toUpperCase()
-    const isExisting = await couponModel.findOne({code:normalisedCode})
-    if(isExisting){
-        throw new ApiError(409,'Coupon already exists')
+    const isExisting = await couponModel.findOne({ code: normalisedCode })
+    if (isExisting) {
+        throw new ApiError(409, 'Coupon already exists')
     }
 
     const expiry = new Date(expiryDate)
-    if(expiry<=new Date()){
-        throw new ApiError(400,'Coupon already expired')
+    if (expiry <= new Date()) {
+        throw new ApiError(400, 'Coupon already expired')
     }
 
 
-    if(discountType==='PERCENTAGE' && maximumDiscount<=0){
-        throw new ApiError(400,'Maximum discount is required for percentage coupons')
+    if (discountType === 'PERCENTAGE' && maximumDiscount <= 0) {
+        throw new ApiError(400, 'Maximum discount is required for percentage coupons')
     }
-    if(discountType === 'PERCENTAGE'){
-        if(discountValue>100){
-            throw new ApiError(400,'Percentage cannot exceed 100%')
+    if (discountType === 'PERCENTAGE') {
+        if (discountValue > 100) {
+            throw new ApiError(400, 'Percentage cannot exceed 100%')
         }
-    }else if(discountType === 'FIXED'){
+    } else if (discountType === 'FIXED') {
         maximumDiscount = 0
     }
 
@@ -395,14 +396,14 @@ const createCoupons = asyncHandler(async (req, res) => {
         maximumDiscount,
         expiryDate,
         usageLimit,
-        createdBy:req.user.id
+        createdBy: req.user.id
     })
 
-    return res.status(201).json(new ApiResponse(201,'Coupon created successfully',coupon))
+    return res.status(201).json(new ApiResponse(201, 'Coupon created successfully', coupon))
 });
 
-const getAllCoupons = asyncHandler(async(req,res)=>{
-    const{
+const getAllCoupons = asyncHandler(async (req, res) => {
+    const {
         search,
         isActive,
         discountType,
@@ -412,30 +413,30 @@ const getAllCoupons = asyncHandler(async(req,res)=>{
 
     const pageNumber = parseInt(page) || 1
     const limitNumber = parseInt(limit) || 5
-    if(pageNumber<1 || limitNumber<1){
-        throw new ApiError(400,'Page or limit number cannot be less than 1')
+    if (pageNumber < 1 || limitNumber < 1) {
+        throw new ApiError(400, 'Page or limit number cannot be less than 1')
     }
 
-    const skip = (pageNumber - 1)*limitNumber
+    const skip = (pageNumber - 1) * limitNumber
     let filter = {}
-    if(search){
-        filter.code={
-            $regex:search,
-            $options:'i'
+    if (search) {
+        filter.code = {
+            $regex: search,
+            $options: 'i'
         }
     }
 
-    if(isActive === 'true'){
+    if (isActive === 'true') {
         filter.isActive = true
-    }else if(isActive === 'false'){
+    } else if (isActive === 'false') {
         filter.isActive = false
     }
 
-    const allowedTypes = ['PERCENTAGE','FIXED']
+    const allowedTypes = ['PERCENTAGE', 'FIXED']
 
-    if(discountType){
-        if(!discountType.includes(allowedTypes)){
-            throw new ApiError(400,'Invalid discount type')
+    if (discountType) {
+        if (!discountType.includes(allowedTypes)) {
+            throw new ApiError(400, 'Invalid discount type')
         }
         filter.discountType = discountType
     }
@@ -443,7 +444,188 @@ const getAllCoupons = asyncHandler(async(req,res)=>{
     const [coupons, totalCoupons] = await Promise.all([
         couponModel
             .find(filter)
-            .sort({createdAt:-1})
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNumber)
+            .populate({
+                path: 'createdBy',
+                select: 'username'
+            }),
+
+        couponModel.countDocuments(filter)
+
+    ])
+
+    const totalPages = Math.ceil(totalCoupons / limitNumber)
+
+    if (coupons.length === 0) {
+        return res.status(200).json(new ApiResponse(200, 'No coupons to fetch', {
+            coupons,
+            'pagination': {
+                'page': pageNumber,
+                'limit': limitNumber,
+                totalCoupons,
+                totalPages
+            }
+        }))
+    }
+
+    return res.status(200).json(new ApiResponse(200, 'Coupons fetched successfully', {
+        coupons,
+        'pagination': {
+            'page': pageNumber,
+            'limit': limitNumber,
+            totalCoupons,
+            totalPages
+        }
+    }))
+});
+
+const getCouponById = asyncHandler(async (req, res) => {
+    const { couponId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(couponId)) {
+        throw new ApiError(400, 'Invalid coupon ID')
+    }
+
+    const coupon = await couponModel
+        .findById(couponId)
+        .populate({
+            path: 'createdBy',
+            select: 'username'
+        })
+    if (!coupon) {
+        throw new ApiError(404, 'Coupon not found')
+    }
+
+    return res.status(200).json(new ApiResponse(200, 'Coupon fetched successfully', coupon))
+
+});
+
+const updateCoupon = asyncHandler(async (req, res) => {
+    const { couponId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(couponId)) {
+        throw new ApiError(400, 'Invalid coupon ID`')
+    }
+
+    const coupon = await couponModel.findById(couponId)
+    if (!coupon) {
+        throw new ApiError(404, 'Coupon not found')
+    }
+
+    const updates = req.body
+
+    if (updates.code) {
+        const normalisedCode = updates.code.trim().toUpperCase()
+        const isExisting = await couponModel.findOne({
+            code: normalisedCode,
+            _id: { $ne: couponId }
+        })
+
+        if (isExisting) {
+            throw new ApiError(409, 'Coupon already exists')
+        }
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+            coupon[key] = value
+        }
+    })
+
+    const expiry = new Date(coupon.expiryDate)
+    if (expiry <= new Date()) {
+        throw new ApiError(400, 'Coupon already expired')
+    }
+
+    if (coupon.discountType === 'PERCENTAGE') {
+        if (coupon.discountValue > 100) throw new ApiError(400, 'Discount value cannot be greater than 100')
+
+        if (coupon.maximumDiscount < 1) throw new ApiError(400, 'Maximum discount anount should be greater than 0')
+    } else if (coupon.discountType === 'FIXED') {
+        coupon.maximumDiscount = 0
+    }
+
+    await coupon.save()
+
+    return res.status(200).json(new ApiResponse(200, 'Coupon updated successfully', coupon))
+
+
+});
+
+const updateCouponStatus = asyncHandler(async (req, res) => {
+    const { couponId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(couponId)) {
+        throw new ApiError(400, 'Coupon ID is invalid')
+    }
+    const coupon = await couponModel.findById(couponId)
+    if (!coupon) {
+        throw new ApiError(404, 'Coupon is not existing')
+    }
+
+    coupon.isActive = !coupon.isActive
+    await coupon.save()
+
+    return res.status(200).json(new ApiResponse(200, 'Coupon status updated successfully', {
+        'currentCouponState': coupon.isActive
+    }))
+});
+
+const createAnnouncements = asyncHandler(async (req, res) => {
+    const {
+        title,
+        description,
+        priority,
+        expiresAt
+    } = req.body
+
+    const expiry = new Date(expiresAt)
+    if (expiry <= new Date()) {
+        throw new ApiError(400, 'Expiry should be in the future')
+    }
+    if (priority < 1) {
+        throw new ApiError(400, 'Priority should be greater than or equal to 1')
+    }
+
+    const announcement = await announcementModel.create({
+        title,
+        description,
+        priority,
+        expiresAt,
+        createdBy: req.user.id
+    })
+
+    return res.status(201).json(new ApiResponse(201, 'Announcement created succesfully', announcement))
+});
+
+const getAnnouncements = asyncHandler(async (req, res) => {
+    const { search, page = 1, limit = 5, isActive } = req.query
+    const pageNumber = parseInt(page) || 1
+    const limitNumber = parseInt(limit) || 5
+    if (pageNumber < 1 || limitNumber < 1) {
+        throw new ApiError(400, 'Page number or limit number is invalid')
+    }
+    const skip = (pageNumber - 1) * limitNumber
+
+    let filter = {}
+    if (search) {
+        filter.title = {
+            $regex:search,
+            $options:"i"
+        }
+    }
+
+    if (isActive === 'true')
+        filter.isActive = true
+    else if (isActive === 'false')
+        filter.isActive = false
+
+    const [announcements, totalAnnouncements] = await Promise.all([
+        announcementModel
+            .find(filter)
+            .sort({
+                priority: -1,
+                createdAt: -1
+            })
             .skip(skip)
             .limit(limitNumber)
             .populate({
@@ -451,122 +633,105 @@ const getAllCoupons = asyncHandler(async(req,res)=>{
                 select:'username'
             }),
 
-        couponModel.countDocuments(filter)
-
+        announcementModel.countDocuments(filter)
     ])
 
-    const totalPages = Math.ceil(totalCoupons/limitNumber)
+    const totalPages = Math.ceil(totalAnnouncements / limitNumber)
 
-    if(coupons.length === 0 ){
-        return res.status(200).json(new ApiResponse(200,'No coupons to fetch',{
-            coupons,
-            'pagination':{
-                'page':pageNumber,
-                'limit':limitNumber,
-                totalCoupons,
+    if (announcements.length === 0) {
+        return res.status(200).json(new ApiResponse(200, 'No announcements fetched', {
+            announcements,
+            'pagination': {
+                'page': pageNumber,
+                'limit': limitNumber,
+                totalAnnouncements,
                 totalPages
             }
         }))
     }
 
-    return res.status(200).json(new ApiResponse(200,'Coupons fetched successfully',{
-        coupons,
-        'pagination':{
-            'page':pageNumber,
-            'limit':limitNumber,
-            totalCoupons,
+    return res.status(200).json(new ApiResponse(200, 'Announcements fetched successfully', {
+        announcements,
+        'pagination': {
+            'page': pageNumber,
+            'limit': limitNumber,
+            totalAnnouncements,
             totalPages
         }
+
     }))
+
+
 });
 
-const getCouponById = asyncHandler(async(req,res)=>{
-    const {couponId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(couponId)){
-        throw new ApiError(400,'Invalid coupon ID')
+const getAnnouncementById = asyncHandler(async(req,res)=>{
+    const {announcementId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(announcementId)){
+        throw new ApiError(400,'Announcement ID is invalid')
     }
 
-    const coupon = await couponModel
-        .findById(couponId)
+    const announcement = await announcementModel
+        .findById(announcementId)
         .populate({
             path:'createdBy',
             select:'username'
         })
-    if(!coupon){
-        throw new ApiError(404,'Coupon not found')
+    if(!announcement){
+        throw new ApiError(404,'Announcement not found')
     }
 
-    return res.status(200).json(new ApiResponse(200,'Coupon fetched successfully',coupon))
-
+    return res.status(200).json(new ApiResponse(200,'Announcement fetched successfully',announcement))
 });
 
-const updateCoupon = asyncHandler(async(req,res)=>{
-    const{couponId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(couponId)){
-        throw new ApiError(400,'Invalid coupon ID`')
+const updateAnnouncement = asyncHandler(async(req,res)=>{
+    const{announcementId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(announcementId)){
+        throw new ApiError(400,'Invalid announcement ID')
     }
 
-    const coupon = await couponModel.findById(couponId)
-    if(!coupon){
-        throw new ApiError(404,'Coupon not found')
+    const announcement = await announcementModel.findById(announcementId)
+    if(!announcement){
+        throw new ApiError(404,'Announcement not found')
     }
 
     const updates = req.body
-
-    if(updates.code){
-        const normalisedCode = updates.code.trim().toUpperCase()
-        const isExisting = await couponModel.findOne({
-            code:normalisedCode,
-            _id:{$ne:couponId}
-        })
-
-        if(isExisting){
-            throw new ApiError(409,'Coupon already exists')
-        }
-    }
-
     Object.entries(updates).forEach(([key,value])=>{
-        if(value !== undefined){
-            coupon[key] = value
-        }
+        if(value!==undefined)
+            announcement[key] = value
     })
 
-    const expiry =new Date(coupon.expiryDate)
-    if(expiry <= new Date()){
-        throw new ApiError(400,'Coupon already expired')
+    if(updates.expiresAt){
+        const expiry = new Date(updates.expiresAt)
+        if(expiry <= new Date()){
+            throw new ApiError(400,'Expiry date must be in future')
+        }
     }
 
-    if(coupon.discountType === 'PERCENTAGE'){
-        if(coupon.discountValue > 100) throw new ApiError(400,'Discount value cannot be greater than 100')
-        
-        if(coupon.maximumDiscount < 1) throw new ApiError(400,'Maximum discount anount should be greater than 0')
-    }else if(coupon.discountType === 'FIXED'){
-        coupon.maximumDiscount = 0
+    if(updates.priority !== undefined){
+        if(updates.priority<1)
+            throw new ApiError(400,'Priority cannot be less than 1')
     }
 
-    await coupon.save()
+    await announcement.save()
 
-    return res.status(200).json(new ApiResponse(200,'Coupon updated successfully',coupon))
-
-    
+    return res.status(200).json(new ApiResponse(200,'Announcement updated successfully',announcement))
 });
 
-const updateCouponStatus = asyncHandler(async(req,res)=>{
-    const{couponId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(couponId)){
-        throw new ApiError(400,'Coupon ID is invalid')
-    }
-    const coupon = await couponModel.findById(couponId)
-    if(!coupon){
-        throw new ApiError(404,'Coupon is not existing')
+const updateAnnouncementStatus = asyncHandler(async(req,res)=>{
+    const{announcementId} = req.params
+    if(!mongoose.Types.ObjectId.isValid(announcementId)){
+        throw new ApiError(400,'Invalid announcement ID')
     }
 
-    coupon.isActive = !coupon.isActive
-    await coupon.save()
+    const announcement = await announcementModel.findById(announcementId)
+    if(!announcement){
+        throw new ApiError(404,'Announcement not found')
+    }
 
-    return res.status(200).json(new ApiResponse(200,'Coupon status updated successfully',{
-        'currentCouponState':coupon.isActive
-    }))
+    announcement.isActive = !announcement.isActive
+    await announcement.save()
+
+    return res.status(200).json(new ApiResponse(200,'Announcement status updated successfully',announcement.isActive))
 })
 
 
@@ -589,5 +754,10 @@ export default {
     getAllCoupons,
     getCouponById,
     updateCoupon,
-    updateCouponStatus
+    updateCouponStatus,
+    createAnnouncements,
+    getAnnouncements,
+    getAnnouncementById,
+    updateAnnouncement,
+    updateAnnouncementStatus
 }

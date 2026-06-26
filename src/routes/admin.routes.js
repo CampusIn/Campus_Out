@@ -5,6 +5,7 @@ import roleMiddleware from "../middlewares/role.middleware.js";
 import settingsValidatorsRules from "../validators/settings.validators.js";
 import couponValidationRules from "../validators/coupon.validators.js";
 import couponUpdateValidationRules from "../validators/couponUpdate.validators.js";
+import announcementValidationRules from "../validators/anouncement.validators.js";
 
 const adminRouter = Router();
 
@@ -40,7 +41,17 @@ adminRouter.get('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),admi
 
 adminRouter.patch('/coupons/:couponId',authMiddleware,roleMiddleware('admin'),couponUpdateValidationRules,adminController.updateCoupon);
 
-adminRouter.patch('/coupons/:couponId/status',authMiddleware,roleMiddleware('admin'),adminController.updateCouponStatus)
+adminRouter.patch('/coupons/:couponId/status',authMiddleware,roleMiddleware('admin'),adminController.updateCouponStatus);
+
+adminRouter.post('/announcements',authMiddleware,roleMiddleware('admin'),announcementValidationRules,adminController.createAnnouncements);
+
+adminRouter.get('/announcements',authMiddleware,roleMiddleware('admin'),adminController.getAnnouncements);
+
+adminRouter.get('/announcements/:announcementId',authMiddleware,roleMiddleware('admin'),adminController.getAnnouncementById);
+
+adminRouter.patch('/announcements/:announcementId',authMiddleware,roleMiddleware('admin'),adminController.updateAnnouncement);
+
+adminRouter.patch('/announcements/:announcementId/status',authMiddleware,roleMiddleware('admin'),adminController.updateAnnouncementStatus)
 
 
 export default adminRouter
