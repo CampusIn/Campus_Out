@@ -8,6 +8,7 @@ import couponUpdateValidationRules from "../validators/couponUpdate.validators.j
 import announcementValidationRules from "../validators/anouncement.validators.js";
 import bannerValidationRules from "../validators/banner.validators.js";
 import bannerUpdateValidationRules from "../validators/bannerUpdate.validators.js";
+import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
 
@@ -55,13 +56,15 @@ adminRouter.patch('/announcements/:announcementId',authMiddleware,roleMiddleware
 
 adminRouter.patch('/announcements/:announcementId/status',authMiddleware,roleMiddleware('admin'),adminController.updateAnnouncementStatus);
 
-adminRouter.post('/banners',authMiddleware,roleMiddleware('admin'),bannerValidationRules,adminController.createBanner);
+adminRouter.post('/banners',authMiddleware,roleMiddleware('admin'),upload.single('image'),bannerValidationRules,adminController.createBanner);
+
 
 adminRouter.get('/banners',authMiddleware,roleMiddleware('admin'),adminController.getAllBanners);
 
 adminRouter.get('/banners/:bannerId',authMiddleware,roleMiddleware('admin'),adminController.getBannerById);
 
-adminRouter.patch('/banners/:bannerId',authMiddleware,roleMiddleware('admin'),bannerUpdateValidationRules,adminController.updateBanner);
+adminRouter.patch('/banners/:bannerId',authMiddleware,roleMiddleware('admin'),upload.single('image'),bannerUpdateValidationRules,adminController.updateBanner);
+
 
 adminRouter.patch('/banners/:bannerId/status',authMiddleware,roleMiddleware('admin'),adminController.updateBannerStatus)
 
