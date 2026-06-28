@@ -1,9 +1,9 @@
 const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 const generateOtpHTML = (otp) => {
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
@@ -32,7 +32,7 @@ const generateOtpHTML = (otp) => {
         </div>
     </body>
 </html>
-    `
-}
+    `;
+};
 
-export { generateOTP, generateOtpHTML }
+export { generateOTP, generateOtpHTML };

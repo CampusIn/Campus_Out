@@ -2,271 +2,563 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import orderModel from "../models/order.models.js";
-import cartModel from '../models/cart.models.js';
+import cartModel from "../models/cart.models.js";
 import userModel from "../models/user.models.js";
 import restaurantModel from "../models/restaurant.models.js";
 import generateOrderNumber from "../utils/orderNumber.utils.js";
 import mongoose from "mongoose";
+import couponModel from "../models/coupon.models.js";
+import platformSettingsModel from "../models/platformSettings.models.js";
+import couponUsageModel from "../models/couponUsage.models.js";
 
 //User order section Start
 const createOrder = asyncHandler(async (req, res) => {
-    const { paymentMethod } = req.body
-    if (paymentMethod !== "COD" && paymentMethod !== "PAY_ON_PICKUP") {
-        throw new ApiError(400, "Choose a payment method")
+  const { paymentMethod, couponId } = req.body;
+  if (paymentMethod !== "COD" && paymentMethod !== "PAY_ON_PICKUP") {
+    throw new ApiError(400, "Choose a payment method");
+  }
+
+  const cart = await cartModel
+    .findOne({
+      user: req.user.id,
+    })
+    .populate({
+      path: "items.menuItem",
+    });
+
+  if (!cart || cart.items.length === 0) {
+    throw new ApiError(400, "Cart is empty");
+  }
+
+  cart.items.forEach((item) => {
+    if (!item.menuItem) {
+      throw new ApiError(400, "One or more items no longer exists");
+    }
+    if (!item.menuItem.isAvailable) {
+      throw new ApiError(400, "One or more items are not available");
+    }
+  });
+
+  const restaurantId = cart.restaurant;
+  const restaurant = await restaurantModel.findById(restaurantId);
+  if (!restaurant) {
+    throw new ApiError(404, "No such restaurant exists");
+  }
+  const restaurantName = restaurant.restaurantName;
+
+  const orderItems = cart.items.map((item) => {
+    const menuItem = item.menuItem._id;
+    const itemName = item.menuItem.name;
+    const priceAtPurchase = item.menuItem.price;
+    const quantity = item.quantity;
+    return { menuItem, itemName, priceAtPurchase, quantity };
+  });
+  const totalAmount = orderItems.reduce((total, item) => {
+    const itemPrice = item.priceAtPurchase * item.quantity;
+    return total + itemPrice;
+  }, 0);
+
+  //If coupon is valid, then coupon discount is calculated
+  if (couponId) {
+    if (!mongoose.Types.ObjectId.isValid(couponId)) {
+      throw new ApiError(400, "Invalid Coupon ID");
+    }
+    const todayDate = new Date();
+    const coupon = await couponModel.findOne({
+      _id: couponId,
+      isActive: true,
+      expiryDate: { $gte: todayDate },
+    });
+
+    if (!coupon) {
+      throw new ApiError(404, "Coupon not found");
     }
 
-    const cart = await cartModel.findOne({
-        user: req.user.id
-    }).populate({
-        path: 'items.menuItem'
-    })
+    const alreadyUsed = await couponUsageModel.findOne({
+      coupon: coupon._id,
+      user: req.user.id,
+    });
 
-    if (!cart || cart.items.length === 0) {
-        throw new ApiError(400, "Cart is empty")
+    if (alreadyUsed) {
+      throw new ApiError(400, "You have already used this coupon");
     }
 
-    cart.items.forEach((item) => {
-        if (!item.menuItem) {
-            throw new ApiError(400, "One or more items no longer exists")
-        }
-        if (!item.menuItem.isAvailable) {
-            throw new ApiError(400, "One or more items are not available")
-        }
-    })
-
-    const restaurantId = cart.restaurant
-    const restaurant = await restaurantModel.findById(restaurantId)
-    if (!restaurant) {
-        throw new ApiError(404, "No such restaurant exists")
+    if (coupon.usageLimit <= coupon.usageCount) {
+      throw new ApiError(400, "Coupon usage limit is over");
     }
-    const restaurantName = restaurant.restaurantName
 
-    const orderItems = cart.items.map((item) => {
-        const menuItem = item.menuItem._id
-        const itemName = item.menuItem.name
-        const priceAtPurchase = item.menuItem.price
-        const quantity = item.quantity
-        return { menuItem, itemName, priceAtPurchase, quantity }
+    if (totalAmount < coupon.minimumOrderValue) {
+      throw new ApiError(
+        400,
+        "Total cart amount is lower than minimum order value for the coupon",
+      );
+    }
 
-    })
-    const totalAmount = orderItems.reduce((total, item) => {
-        const itemPrice = item.priceAtPurchase * item.quantity
-        return total + itemPrice
-    }, 0)
+    let discount;
 
-    const order = await orderModel.create({
-        user: req.user.id,
-        restaurant: restaurantId,
-        restaurantName,
-        items: orderItems,
-        totalAmount,
-        orderNumber: generateOrderNumber(),
-        paymentMethod
-    })
+    if (coupon.discountType === "PERCENTAGE") {
+      discount = Math.round((totalAmount * coupon.discountValue) / 100);
+      if (discount > coupon.maximumDiscount) {
+        discount = coupon.maximumDiscount;
+      }
+    } else if (coupon.discountType === "FIXED") {
+      discount = coupon.discountValue;
+    }
 
-    await cartModel.findOneAndDelete({ user: req.user.id })
-    return res.status(200).json(new ApiResponse(200, "Order created successful", order))
+    const platformSettings = await platformSettingsModel.findOne();
+    if (!platformSettings) {
+      throw new ApiError(404, "Platform settings not found");
+    }
 
+    const couponDiscount = Math.min(discount, totalAmount);
+    const subTotalAfterDiscount = totalAmount - couponDiscount;
+    const gstPercentage = platformSettings.gstPercentage;
+    const gstAmount = Math.round((subTotalAfterDiscount * gstPercentage) / 100);
+    let deliveryCharge = platformSettings.deliveryCharge;
+    const packagingCharge = platformSettings.packagingCharge;
+    const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
 
+    if (freeDeliveryAbove <= subTotalAfterDiscount) deliveryCharge = 0;
 
+    const finalAmount =
+      subTotalAfterDiscount + gstAmount + deliveryCharge + packagingCharge;
 
+    const session = await mongoose.startSession();
+    let order;
+
+    try {
+      session.startTransaction();
+
+      [order] = await orderModel.create(
+        [
+          {
+            user: req.user.id,
+            restaurant: restaurantId,
+            restaurantName,
+            items: orderItems,
+            finalAmount,
+            orderNumber: generateOrderNumber(),
+            paymentMethod,
+            coupon: couponId,
+            couponCode: coupon.code,
+            discountAmount: couponDiscount,
+          },
+        ],
+        { session },
+      );
+
+      await Promise.all([
+        couponModel.findByIdAndUpdate(
+          coupon._id,
+          {
+            $inc: {
+              usageCount: 1,
+            },
+          },
+          { session },
+        ),
+
+        couponUsageModel.create(
+          [
+            {
+              coupon: coupon._id,
+              user: req.user.id,
+              order: order._id,
+            },
+          ],
+          { session },
+        ),
+
+        cartModel.findOneAndDelete({ user: req.user.id }, { session }),
+      ]);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw new ApiError(500, error.message);
+    } finally {
+      session.endSession();
+    }
+
+    return res.status(200).json(
+      new ApiResponse(200, "Order created successful", {
+        applied: true,
+        order,
+      }),
+    );
+  }
+
+  const gstPercentage = platformSettings.gstPercentage;
+  const gstAmount = Math.round((totalAmount * gstPercentage) / 100);
+  let deliveryCharge = platformSettings.deliveryCharge;
+  const packagingCharge = platformSettings.packagingCharge;
+  const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
+
+  if (freeDeliveryAbove <= totalAmount) deliveryCharge = 0;
+
+  const finalAmount =
+    totalAmount + gstAmount + deliveryCharge + packagingCharge;
+
+  const order = await orderModel.create({
+    user: req.user.id,
+    restaurant: restaurantId,
+    restaurantName,
+    items: orderItems,
+    totalAmount,
+    orderNumber: generateOrderNumber(),
+    paymentMethod,
+  });
+
+  await cartModel.findOneAndDelete({ user: req.user.id });
+  return res.status(200).json(
+    new ApiResponse(200, "Order created successful", {
+      applied: false,
+      order,
+    }),
+  );
 });
 
 const getAllOrders = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 10
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(404, "Invalid page number or limit number")
-    }
-    const skip = (pageNumber - 1) * limitNumber
-    const totalOrders = await orderModel.countDocuments({ user: req.user.id })
-    if (totalOrders === 0) {
-        return res.status(200).json(new ApiResponse(200, "No order found", {
-            "orders": []
-        }))
-    }
-    const orders = await orderModel
-        .find({ user: req.user.id }, "orderNumber restaurantName totalAmount orderStatus createdAt")
-        .sort({ "createdAt": -1 })
-        .skip(skip)
-        .limit(limitNumber)
+  const { page = 1, limit = 10 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 10;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(404, "Invalid page number or limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
+  const totalOrders = await orderModel.countDocuments({ user: req.user.id });
+  if (totalOrders === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No order found", {
+        orders: [],
+      }),
+    );
+  }
+  const orders = await orderModel
+    .find(
+      { user: req.user.id },
+      "orderNumber restaurantName totalAmount orderStatus createdAt",
+    )
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limitNumber);
 
+  const totalPages = Math.ceil(totalOrders / limitNumber);
+  if (orders.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No order found", {
+        orders: [],
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalOrders,
+          totalPages,
+        },
+      }),
+    );
+  }
 
-    const totalPages = Math.ceil(totalOrders / limitNumber)
-    if (orders.length === 0) {
-        return res.status(200).json(new ApiResponse(200, "No order found", {
-            "orders": [],
-            "pagination": {
-                "page": pageNumber,
-                "limit": limitNumber,
-                totalOrders,
-                totalPages
-
-            }
-        }))
-
-    }
-
-    return res.status(200).json(new ApiResponse(200, "Order history fetched successfuly", {
-        orders,
-        "pagination": {
-            "page": pageNumber,
-            "limit": limitNumber,
-            totalOrders,
-            totalPages
-
-        }
-    }))
+  return res.status(200).json(
+    new ApiResponse(200, "Order history fetched successfuly", {
+      orders,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalOrders,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const getSingleOrder = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-        throw new ApiError(400, "Inavlid order Id")
-    }
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Inavlid order Id");
+  }
 
-    const order = await orderModel
-        .findById(orderId)
-        .select("user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount createdAt")
-        .populate({
-            path: 'items.menuItem',
-            select: 'image'
-        })
-    if (!order) {
-        throw new ApiError(404, "Order not found")
-    }
-    if (order.user.toString() !== req.user.id) {
-        throw new ApiError(403, "Forbidden")
-    }
+  const order = await orderModel
+    .findById(orderId)
+    .select(
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount createdAt",
+    )
+    .populate({
+      path: "items.menuItem",
+      select: "image",
+    });
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+  if (order.user.toString() !== req.user.id) {
+    throw new ApiError(403, "Forbidden");
+  }
 
-    return res.status(200).json(new ApiResponse(200, "Order details fetched successfuly", order))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Order details fetched successfuly", order));
 });
 
 const cancelOrder = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-        throw new ApiError(400, "Invalid Order")
-    }
-    const order = await orderModel.findById(orderId)
-    if (!order) {
-        throw new ApiError(404, "Order does not exist")
-    }
-    console.log(order.user.toString())
-    console.log(req.user.id)
-    if (order.user.toString() !== req.user.id) {
-        throw new ApiError(403, " Forbidden")
-    }
-    if (order.orderStatus !== "PENDING") {
-        throw new ApiError(409, "Only pending orders can be cancelled")
-    }
-    order.orderStatus = "CANCELLED"
-    await order.save()
-    return res.status(200).json(new ApiResponse(200, "Order has been cancelled", order))
-})
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order");
+  }
+  const order = await orderModel.findById(orderId);
+  if (!order) {
+    throw new ApiError(404, "Order does not exist");
+  }
+  console.log(order.user.toString());
+  console.log(req.user.id);
+  if (order.user.toString() !== req.user.id) {
+    throw new ApiError(403, " Forbidden");
+  }
+  if (order.orderStatus !== "PENDING") {
+    throw new ApiError(409, "Only pending orders can be cancelled");
+  }
+  order.orderStatus = "CANCELLED";
+  await order.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Order has been cancelled", order));
+});
 
 //User order section Finished
 
 //Vendor order section Start
 
 const getVendorOrder = asyncHandler(async (req, res) => {
+  const restaurant = await restaurantModel.findOne({ owner: req.user.id });
+  if (!restaurant) {
+    throw new ApiError(404, "No restaurant found");
+  }
 
-    const restaurant = await restaurantModel.findOne({ owner: req.user.id })
-    if (!restaurant) {
-        throw new ApiError(404, "No restaurant found")
-    }
+  const { page = 1, limit = 10 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 10;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid page number or limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
 
-    const { page = 1, limit = 10 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 10
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, "Invalid page number or limit number")
-    }
-    const skip = (pageNumber - 1) * limitNumber
+  const totalOrders = await orderModel.countDocuments({
+    restaurant: restaurant._id,
+  });
+  const totalPages = Math.ceil(totalOrders / limitNumber);
+  const orders = await orderModel
+    .find({ restaurant: restaurant._id })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limitNumber)
+    .populate({
+      path: "user",
+      select: "username",
+    });
 
-    const totalOrders = await orderModel.countDocuments({ restaurant: restaurant._id })
-    const totalPages = Math.ceil(totalOrders / limitNumber)
-    const orders = await orderModel
-        .find({ restaurant: restaurant._id })
-        .sort({ "createdAt": -1 })
-        .skip(skip)
-        .limit(limitNumber)
-        .populate({
-            path: "user",
-            select: "username"
-        })
+  if (orders.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No orders to show", {
+        orders: [],
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalOrders,
+          totalPages,
+        },
+      }),
+    );
+  }
 
-
-    if (orders.length === 0) {
-        return res.status(200).json(new ApiResponse(200, "No orders to show", {
-            "orders": [],
-            "pagination": {
-                "page": pageNumber,
-                "limit": limitNumber,
-                totalOrders,
-                totalPages
-            }
-        }))
-    }
-
-    return res.status(200).json(new ApiResponse(200, "Orders fetched succesfuly", {
-        orders,
-        "pagination": {
-            "page": pageNumber,
-            "limit": limitNumber,
-            totalOrders,
-            totalPages
-        }
-    }))
+  return res.status(200).json(
+    new ApiResponse(200, "Orders fetched succesfuly", {
+      orders,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalOrders,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const changeOrderStatus = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
-    const { orderStatus } = req.body
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-        throw new ApiError(400, "Inavlid Order Id")
-    }
-    const allowedStatus = [
-        "CONFIRMED",
-        "PREPARING",
-        "READY",
-        "DELIVERED"
-    ]
+  const { orderId } = req.params;
+  const { orderStatus } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Inavlid Order Id");
+  }
+  const allowedStatus = ["CONFIRMED", "PREPARING", "READY", "DELIVERED"];
 
-    const isValidStatus = allowedStatus.includes(orderStatus)
-    if(!isValidStatus){
-        throw new ApiError(400,"Invalid Order status")
-    }
+  const isValidStatus = allowedStatus.includes(orderStatus);
+  if (!isValidStatus) {
+    throw new ApiError(400, "Invalid Order status");
+  }
 
-    const order = await orderModel.findById(orderId).populate({
-        path:'restaurant',
-        select:'owner'
-    })
-    if(!order){
-        throw new ApiError(404,"Order not found")
-    }
-    if(order.restaurant.owner.toString() !== req.user.id){
-        throw new ApiError(403,"Forbidden, you are not the owner of restaurant")
-    }
+  const order = await orderModel.findById(orderId).populate({
+    path: "restaurant",
+    select: "owner",
+  });
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+  if (order.restaurant.owner.toString() !== req.user.id) {
+    throw new ApiError(403, "Forbidden, you are not the owner of restaurant");
+  }
 
-    if(order.orderStatus === "DELIVERED"){
-        throw new ApiError(409,"Order is delivered,no more changes can be made")
-    }
-    order.orderStatus = orderStatus
-    await order.save()
-    return res.status(200).json(new ApiResponse(200,"Order status updated successfuly",{
-        "orderNumber":order.orderNumber,
-        "orderStatus":order.orderStatus
-    }))
+  if (order.orderStatus === "DELIVERED") {
+    throw new ApiError(409, "Order is delivered,no more changes can be made");
+  }
+  order.orderStatus = orderStatus;
+  await order.save();
+  return res.status(200).json(
+    new ApiResponse(200, "Order status updated successfuly", {
+      orderNumber: order.orderNumber,
+      orderStatus: order.orderStatus,
+    }),
+  );
 });
 //Vendor order section Finished
 
-export default {
-    createOrder,
-    getAllOrders,
-    getSingleOrder,
-    cancelOrder,
-    getVendorOrder,
-    changeOrderStatus
+
+//Coupon selection Module starts
+
+const getAllCoupons = asyncHandler(async (req, res) => {
+  const todayDate = new Date();
+  const coupons = await couponModel
+    .find({
+      isActive: true,
+      expiryDate: { $gte: todayDate },
+    })
+    .sort({
+      maximumDiscount: -1,
+      expiryDate: -1,
+    })
+    .select(
+      "_id code discountType discountValue minimumOrderValue maximumDiscount expiryDate",
+    );
+
+  if (coupons.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "No coupons to show", coupons));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Coupons fetched successfully", coupons));
+});
+
+const applyCoupon = asyncHandler(async (req, res) => {
+  const { couponId } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(couponId)) {
+    throw new ApiError(400, "Invalid Coupon ID");
+  }
+  const todayDate = new Date();
+  const coupon = await couponModel.findOne({
+    _id: couponId,
+    isActive: true,
+    expiryDate: { $gte: todayDate },
+  });
+
+  if (!coupon) {
+    throw new ApiError(400, "Invalid coupon");
+  }
+
+  const cart = await cartModel.findOne({
+    user: req.user.id,
+  });
+
+  if (!cart) {
+    throw new ApiError(404, "Cart not found");
+  }
+  if (cart.items.length === 0) {
+    throw new ApiError(400, "Cart is empty");
+  }
+
+  const [alreadyUsed, platformSettings] = await Promise.all([
+    couponUsageModel.findOne({
+      coupon: coupon._id,
+      user: req.user.id,
+    }),
+
+    platformSettingsModel.findOne(),
+  ]);
+
+  if (alreadyUsed) {
+    throw new ApiError(400, "You have already used this coupon");
+  }
+
+  if (coupon.usageLimit <= coupon.usageCount) {
+    throw new ApiError(400, "Coupon usage limit is over");
+  }
+
+  if (coupon.minimumOrderValue > cart.totalAmount) {
+    throw new ApiError(
+      400,
+      "Total should be above minimum order value to apply the coupon",
+    );
+  }
+
+  let discount;
+
+  if (coupon.discountType === "PERCENTAGE") {
+    discount = Math.round((cart.totalAmount * coupon.discountValue) / 100);
+    if (discount > coupon.maximumDiscount) {
+      discount = coupon.maximumDiscount;
+    }
+  } else if (coupon.discountType === "FIXED") {
+    discount = coupon.discountValue;
+  }
+
+  if (!platformSettings) {
+    throw new ApiError(404, "Platform settings not found");
+  }
+
+  const subTotal = cart.totalAmount;
+  const couponDiscount = Math.min(discount, subTotal);
+  const subTotalAfterDiscount = subTotal - couponDiscount;
+  const gstPercentage = platformSettings.gstPercentage;
+  const gstAmount = Math.round((subTotalAfterDiscount * gstPercentage) / 100);
+  let deliveryCharge = platformSettings.deliveryCharge;
+  const packagingCharge = platformSettings.packagingCharge;
+  const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
+
+  if (freeDeliveryAbove <= subTotalAfterDiscount) deliveryCharge = 0;
+
+  const finalAmount =
+    subTotalAfterDiscount + gstAmount + deliveryCharge + packagingCharge;
+
+  return res.status(200).json(
+    new ApiResponse(200, "Final cart summary fetched successfully", {
+      applied: true,
+      coupon: {
+        code: coupon.code,
+        couponId,
+        couponDiscount,
+      },
+      pricing: {
+        subTotal,
+        couponDiscount,
+        subTotalAfterDiscount,
+        gstAmount,
+        packagingCharge,
+        deliveryCharge,
+        finalAmount,
+      },
+    }),
+  );
+});
+
+const removeCoupon = asyncHandler(async(req,res)=>{
     
-}
+})
+
+export default {
+  createOrder,
+  getAllOrders,
+  getSingleOrder,
+  cancelOrder,
+  getVendorOrder,
+  changeOrderStatus,
+  applyCoupon,
+  getAllCoupons
+};

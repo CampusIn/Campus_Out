@@ -90,14 +90,14 @@ The Express app enables JSON request bodies, request logging, cookies, and CORS 
 
 Base path: `/api/auth`
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/register` | Register a user and send an OTP email. |
-| POST | `/verify-email` | Verify email with OTP and create a session. |
-| POST | `/login` | Log in and receive an access token. |
-| POST | `/refresh-token` | Rotate the refresh token and issue a new access token. |
-| POST | `/logout` | Revoke the current refresh-token session. |
-| POST | `/logout-all` | Revoke all active sessions for the user. |
+| Method | Endpoint         | Description                                            |
+| ------ | ---------------- | ------------------------------------------------------ |
+| POST   | `/register`      | Register a user and send an OTP email.                 |
+| POST   | `/verify-email`  | Verify email with OTP and create a session.            |
+| POST   | `/login`         | Log in and receive an access token.                    |
+| POST   | `/refresh-token` | Rotate the refresh token and issue a new access token. |
+| POST   | `/logout`        | Revoke the current refresh-token session.              |
+| POST   | `/logout-all`    | Revoke all active sessions for the user.               |
 
 Request bodies:
 
@@ -124,16 +124,16 @@ Middleware behavior:
 
 Base path: `/api`
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| POST | `/restaurants` | Vendor | Create a restaurant owned by the authenticated vendor. |
-| PATCH | `/restaurants/:id` | Vendor owner | Update allowed restaurant fields. |
-| GET | `/restaurants/my` | Vendor | Fetch restaurants owned by the authenticated vendor. |
-| GET | `/restaurants/:id` | Authenticated owner | Fetch a restaurant for its owner. |
-| DELETE | `/restaurants/:id` | Vendor owner | Delete a restaurant. |
-| PATCH | `/restaurants/:id/status` | Vendor owner | Update `isOpen`. |
-| GET | `/restaurants` | Public | List open restaurants. |
-| GET | `/restaurant/:id` | Public | Fetch one open restaurant. |
+| Method | Endpoint                  | Access              | Description                                            |
+| ------ | ------------------------- | ------------------- | ------------------------------------------------------ |
+| POST   | `/restaurants`            | Vendor              | Create a restaurant owned by the authenticated vendor. |
+| PATCH  | `/restaurants/:id`        | Vendor owner        | Update allowed restaurant fields.                      |
+| GET    | `/restaurants/my`         | Vendor              | Fetch restaurants owned by the authenticated vendor.   |
+| GET    | `/restaurants/:id`        | Authenticated owner | Fetch a restaurant for its owner.                      |
+| DELETE | `/restaurants/:id`        | Vendor owner        | Delete a restaurant.                                   |
+| PATCH  | `/restaurants/:id/status` | Vendor owner        | Update `isOpen`.                                       |
+| GET    | `/restaurants`            | Public              | List open restaurants.                                 |
+| GET    | `/restaurant/:id`         | Public              | Fetch one open restaurant.                             |
 
 Create body:
 
@@ -162,14 +162,14 @@ Vendor restaurant update/status and menu operations pass through both `blockMidd
 
 Base path: `/api/restaurants`
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| POST | `/:restaurantId/menu` | Vendor owner | Create a menu item for a restaurant. |
-| GET | `/:restaurantId/menu` | Public | Fetch active menu items for a restaurant. |
-| GET | `/menu/:id` | Public | Fetch one non-deleted menu item. |
-| PATCH | `/menu/:id` | Vendor owner | Update allowed menu fields. |
-| PATCH | `/menu/:id/status` | Vendor owner | Update availability. |
-| DELETE | `/menu/:id` | Vendor owner | Soft delete a menu item. |
+| Method | Endpoint              | Access       | Description                               |
+| ------ | --------------------- | ------------ | ----------------------------------------- |
+| POST   | `/:restaurantId/menu` | Vendor owner | Create a menu item for a restaurant.      |
+| GET    | `/:restaurantId/menu` | Public       | Fetch active menu items for a restaurant. |
+| GET    | `/menu/:id`           | Public       | Fetch one non-deleted menu item.          |
+| PATCH  | `/menu/:id`           | Vendor owner | Update allowed menu fields.               |
+| PATCH  | `/menu/:id/status`    | Vendor owner | Update availability.                      |
+| DELETE | `/menu/:id`           | Vendor owner | Soft delete a menu item.                  |
 
 Menu creation uses `multipart/form-data` and requires an uploaded file field named `image`. The uploaded file is temporarily stored in `public/temp`, uploaded to Cloudinary, and saved as the menu item's image URL.
 
@@ -197,13 +197,13 @@ Menu management routes also enforce vendor ownership, blocked-user checks, and r
 
 Base path: `/api/user`
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| POST | `/cart/items` | User | Add an item to the authenticated user's cart. |
-| GET | `/cart` | User | Fetch the authenticated user's cart. |
-| PATCH | `/cart/items/:menuItemId` | User | Update an item's quantity. |
-| DELETE | `/cart/items/:menuItemId` | User | Remove one item from the cart. |
-| DELETE | `/cart` | User | Clear the entire cart. |
+| Method | Endpoint                  | Access | Description                                   |
+| ------ | ------------------------- | ------ | --------------------------------------------- |
+| POST   | `/cart/items`             | User   | Add an item to the authenticated user's cart. |
+| GET    | `/cart`                   | User   | Fetch the authenticated user's cart.          |
+| PATCH  | `/cart/items/:menuItemId` | User   | Update an item's quantity.                    |
+| DELETE | `/cart/items/:menuItemId` | User   | Remove one item from the cart.                |
+| DELETE | `/cart`                   | User   | Clear the entire cart.                        |
 
 Add/update body:
 
@@ -227,14 +227,14 @@ Cart behavior:
 
 Base path: `/api/user`
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| POST | `/order` | User | Create an order from the user's cart. |
-| GET | `/orders/my` | User | Fetch the user's order history. |
-| GET | `/orders/:orderId` | User owner | Fetch one order. |
-| PATCH | `/orders/:orderId/cancel` | User owner | Cancel a pending order. |
-| GET | `/order/restaurant` | Vendor | Fetch orders for the vendor's restaurant. |
-| PATCH | `/order/:orderId/status` | Vendor owner | Update an order status. |
+| Method | Endpoint                  | Access       | Description                               |
+| ------ | ------------------------- | ------------ | ----------------------------------------- |
+| POST   | `/order`                  | User         | Create an order from the user's cart.     |
+| GET    | `/orders/my`              | User         | Fetch the user's order history.           |
+| GET    | `/orders/:orderId`        | User owner   | Fetch one order.                          |
+| PATCH  | `/orders/:orderId/cancel` | User owner   | Cancel a pending order.                   |
+| GET    | `/order/restaurant`       | Vendor       | Fetch orders for the vendor's restaurant. |
+| PATCH  | `/order/:orderId/status`  | Vendor owner | Update an order status.                   |
 
 Create order body:
 
@@ -273,12 +273,12 @@ Order behavior:
 
 Base path: `/api/user`
 
-| Method | Endpoint | Access | Description |
-| --- | --- | --- | --- |
-| POST | `/reviews/:restaurantId` | User | Create a review for a restaurant. |
-| GET | `/restaurants/:restaurantId/reviews` | Public | Fetch restaurant reviews. |
-| PATCH | `/reviews/:reviewId` | User owner | Update a review. |
-| DELETE | `/reviews/:reviewId` | User owner | Delete a review. |
+| Method | Endpoint                             | Access     | Description                       |
+| ------ | ------------------------------------ | ---------- | --------------------------------- |
+| POST   | `/reviews/:restaurantId`             | User       | Create a review for a restaurant. |
+| GET    | `/restaurants/:restaurantId/reviews` | Public     | Fetch restaurant reviews.         |
+| PATCH  | `/reviews/:reviewId`                 | User owner | Update a review.                  |
+| DELETE | `/reviews/:reviewId`                 | User owner | Delete a review.                  |
 
 Create/update body:
 
@@ -304,18 +304,18 @@ Base path: `/api/admin`
 
 All admin routes require authentication and the `admin` role.
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/dashboard` | Fetch dashboard metrics. |
-| GET | `/dashboard/users` | List users with search and pagination. |
-| GET | `/dashboard/vendors` | List vendors with search and pagination. |
-| GET | `/dashboard/restaurants` | List restaurants with filters and pagination. |
-| PATCH | `/users/:id/block` | Block a user. |
-| PATCH | `/users/:id/unblock` | Unblock a user. |
-| PATCH | `/restaurants/:id/suspend` | Suspend a restaurant. |
-| PATCH | `/restaurants/:id/activate` | Reactivate a suspended restaurant. |
-| GET | `/orders` | List all orders with optional status filtering. |
-| GET | `/orders/:id` | Fetch a single order with user and item details. |
+| Method | Endpoint                    | Description                                      |
+| ------ | --------------------------- | ------------------------------------------------ |
+| GET    | `/dashboard`                | Fetch dashboard metrics.                         |
+| GET    | `/dashboard/users`          | List users with search and pagination.           |
+| GET    | `/dashboard/vendors`        | List vendors with search and pagination.         |
+| GET    | `/dashboard/restaurants`    | List restaurants with filters and pagination.    |
+| PATCH  | `/users/:id/block`          | Block a user.                                    |
+| PATCH  | `/users/:id/unblock`        | Unblock a user.                                  |
+| PATCH  | `/restaurants/:id/suspend`  | Suspend a restaurant.                            |
+| PATCH  | `/restaurants/:id/activate` | Reactivate a suspended restaurant.               |
+| GET    | `/orders`                   | List all orders with optional status filtering.  |
+| GET    | `/orders/:id`               | Fetch a single order with user and item details. |
 
 Dashboard metrics:
 

@@ -1,43 +1,46 @@
 import mongoose from "mongoose";
 
-const cartItemSchema = new mongoose.Schema({
-    menuItem:{
-        type:mongoose.Schema.Types.ObjectId,
-            ref:"Menu",
-            required:[true,"Item is required"]
+const cartItemSchema = new mongoose.Schema(
+  {
+    menuItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Menu",
+      required: [true, "Item is required"],
     },
-    quantity:{
-        type:Number,
-        required:true,
-        min:[1,"Atleast 1 item should be added"]
-    }
-},{
-    _id:false
-})
-
-
-const cartSchema = new mongoose.Schema({
-    user:{
-        type: mongoose.Schema.Types.ObjectId,
-        ref:'User',
-        required:[true,"User Id is required"],
-        unique:true
+    quantity: {
+      type: Number,
+      required: true,
+      min: [1, "Atleast 1 item should be added"],
     },
-    restaurant:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Restaurant",
+  },
+  {
+    _id: false,
+  },
+);
+
+const cartSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User Id is required"],
+      unique: true,
     },
-    items:[cartItemSchema],
-    totalAmount:{
-        type:Number,
-        default:0,
-    }
-},{
-    timestamps:true
-})
+    restaurant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Restaurant",
+    },
+    items: [cartItemSchema],
+    totalAmount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
+const cartModel = mongoose.model("Cart", cartSchema);
 
-
-const cartModel = mongoose.model('Cart',cartSchema)
-
-export default cartModel
+export default cartModel;

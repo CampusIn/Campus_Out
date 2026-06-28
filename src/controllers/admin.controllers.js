@@ -11,940 +11,967 @@ import mongoose from "mongoose";
 import announcementModel from "../models/anouncement.models.js";
 import bannerModel from "../models/banners.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
+import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
-    const [
-        userCount,
-        vendorCount,
-        restaurantCount,
-        orderCount,
-        revenue
-    ] = await Promise.all([
-        userModel.countDocuments({ role: 'user' }),
-        userModel.countDocuments({ role: 'vendor' }),
-        restaurantModel.countDocuments(),
-        orderModel.countDocuments(),
-        getRevenueStats()
+  const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
+    await Promise.all([
+      userModel.countDocuments({ role: "user" }),
+      userModel.countDocuments({ role: "vendor" }),
+      restaurantModel.countDocuments(),
+      orderModel.countDocuments(),
+      getRevenueStats(),
+    ]);
 
-    ])
-
-
-    return res.status(200).json(new ApiResponse(200, 'Dashboard details fetched successfully', {
-        userCount,
-        vendorCount,
-        restaurantCount,
-        orderCount,
-        revenue
-    }))
+  return res.status(200).json(
+    new ApiResponse(200, "Dashboard details fetched successfully", {
+      userCount,
+      vendorCount,
+      restaurantCount,
+      orderCount,
+      revenue,
+    }),
+  );
 });
 
 const viewUsers = asyncHandler(async (req, res) => {
-    const { search, page = 1, limit = 5 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Invalid page number or limit number')
-    }
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {
-        role: 'user'
-    }
-    if (search) {
-        filter.username = {
-            $regex: search,
-            $options: 'i'
-        }
+  const { search, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid page number or limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {
+    role: "user",
+  };
+  if (search) {
+    filter.username = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+  const [matchedUsers, totalUsers] = await Promise.all([
+    userModel.find(filter).skip(skip).limit(limitNumber).select("-password"),
 
-    }
-    const [matchedUsers, totalUsers] = await Promise.all([
-        userModel
-            .find(filter)
-            .skip(skip)
-            .limit(limitNumber)
-            .select('-password'),
+    userModel.countDocuments(filter),
+  ]);
 
-        userModel.countDocuments(filter)
+  const totalPages = Math.ceil(totalUsers / limitNumber);
 
-    ])
-
-    const totalPages = Math.ceil(totalUsers / limitNumber)
-
-    return res.status(200).json(new ApiResponse(200, 'User details fetched successfuly', {
-        users: matchedUsers,
-        "pagination": {
-            "page": pageNumber,
-            "limit": limitNumber,
-            totalUsers,
-            totalPages
-        }
-    }))
-
-
+  return res.status(200).json(
+    new ApiResponse(200, "User details fetched successfuly", {
+      users: matchedUsers,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalUsers,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const viewVendors = asyncHandler(async (req, res) => {
-    const { search, page = 1, limit = 5 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Invalid page number or limit number')
-    }
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {
-        role: 'vendor'
-    }
-    if (search) {
-        filter.username = {
-            $regex: search,
-            $options: 'i'
-        }
+  const { search, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid page number or limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {
+    role: "vendor",
+  };
+  if (search) {
+    filter.username = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+  const [matchedVendors, totalVendor] = await Promise.all([
+    userModel.find(filter).skip(skip).limit(limitNumber).select("-password"),
 
-    }
-    const [matchedVendors, totalVendor] = await Promise.all([
-        userModel
-            .find(filter)
-            .skip(skip)
-            .limit(limitNumber)
-            .select('-password'),
+    userModel.countDocuments(filter),
+  ]);
 
-        userModel.countDocuments(filter)
+  const totalPages = Math.ceil(totalVendor / limitNumber);
 
-    ])
-
-    const totalPages = Math.ceil(totalVendor / limitNumber)
-
-    return res.status(200).json(new ApiResponse(200, 'Vendor details fetched successfuly', {
-        venodors: matchedVendors,
-        "pagination": {
-            "page": pageNumber,
-            "limit": limitNumber,
-            totalVendor,
-            totalPages
-        }
-    }))
-
-
+  return res.status(200).json(
+    new ApiResponse(200, "Vendor details fetched successfuly", {
+      venodors: matchedVendors,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalVendor,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const viewRestaurants = asyncHandler(async (req, res) => {
-    const { search, category, isOpen, page = 1, limit = 5 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Invalid page number or limit number')
-    }
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {}
-    if (search) {
-        filter.restaurantName = {
-            $regex: search,
-            $options: 'i'
-        }
-    }
-    if (isOpen === 'true') {
-        filter.isOpen = true
-    }
-    else if (isOpen === 'false') {
-        filter.isOpen = false
-    }
-    if (category) {
-        filter.category = category
-    }
+  const { search, category, isOpen, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid page number or limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  if (search) {
+    filter.restaurantName = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+  if (isOpen === "true") {
+    filter.isOpen = true;
+  } else if (isOpen === "false") {
+    filter.isOpen = false;
+  }
+  if (category) {
+    filter.category = category;
+  }
 
-    const [matchedRestaurants, totalRestaurants] = await Promise.all([
-        restaurantModel
-            .find(filter)
-            .skip(skip)
-            .limit(limitNumber),
+  const [matchedRestaurants, totalRestaurants] = await Promise.all([
+    restaurantModel.find(filter).skip(skip).limit(limitNumber),
 
-        restaurantModel.countDocuments(filter)
-    ])
+    restaurantModel.countDocuments(filter),
+  ]);
 
-    const totalPages = Math.ceil(totalRestaurants / limitNumber)
+  const totalPages = Math.ceil(totalRestaurants / limitNumber);
 
-    return res.status(200).json(new ApiResponse(200, 'Restaurant details fetched successfully', {
-        'restaurants': matchedRestaurants,
-        'pagination': {
-            'page': pageNumber,
-            'limit': limitNumber,
-            totalRestaurants,
-            totalPages
-        }
-    }))
-
+  return res.status(200).json(
+    new ApiResponse(200, "Restaurant details fetched successfully", {
+      restaurants: matchedRestaurants,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalRestaurants,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const blockUser = asyncHandler(async (req, res) => {
-    const userId = req.params.id
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        throw new ApiError(404, 'Invalid User ID')
-    }
+  const userId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(404, "Invalid User ID");
+  }
 
-    const user = await userModel.findByIdAndUpdate(userId, {
-        isBlocked: true
-    })
+  const user = await userModel.findByIdAndUpdate(userId, {
+    isBlocked: true,
+  });
 
-    if (!user) {
-        throw new ApiError(404, 'User not found')
-    }
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'User blocked successfully'))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "User blocked successfully"));
 });
 
 const unBlockUser = asyncHandler(async (req, res) => {
-    const userId = req.params.id
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        throw new ApiError(404, 'Invalid User ID')
-    }
+  const userId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(404, "Invalid User ID");
+  }
 
-    const user = await userModel.findByIdAndUpdate(userId, {
-        isBlocked: false
-    })
+  const user = await userModel.findByIdAndUpdate(userId, {
+    isBlocked: false,
+  });
 
-    if (!user) {
-        throw new ApiError(404, 'User not found')
-    }
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'User un-blocked successfully'))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "User un-blocked successfully"));
 });
 
 const suspendRestaurant = asyncHandler(async (req, res) => {
-    const restaurantId = req.params.id
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
-        throw new ApiError(404, 'Inavlid restaurant ID')
-    }
+  const restaurantId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    throw new ApiError(404, "Inavlid restaurant ID");
+  }
 
-    const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
-        isSuspended: true,
-        isOpen: false
-    })
+  const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
+    isSuspended: true,
+    isOpen: false,
+  });
 
-    if (!restaurant) {
-        throw new ApiError(404, 'Restaurant not found')
-    }
+  if (!restaurant) {
+    throw new ApiError(404, "Restaurant not found");
+  }
 
-    return res.status(200).json(200, 'Restuarant suspended successfully')
+  return res.status(200).json(200, "Restuarant suspended successfully");
 });
 
 const activateRestaurant = asyncHandler(async (req, res) => {
-    const restaurantId = req.params.id
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
-        throw new ApiError(400, 'Inavlid restaurant ID')
-    }
+  const restaurantId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    throw new ApiError(400, "Inavlid restaurant ID");
+  }
 
-    const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
-        isSuspended: false,
-        isOpen: true
-    })
+  const restaurant = await restaurantModel.findByIdAndUpdate(restaurantId, {
+    isSuspended: false,
+    isOpen: true,
+  });
 
-    if (!restaurant) {
-        throw new ApiError(404, 'Restaurant not found')
-    }
+  if (!restaurant) {
+    throw new ApiError(404, "Restaurant not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'Restuarant activated successfully'))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Restuarant activated successfully"));
 });
 
 const getAllOrders = asyncHandler(async (req, res) => {
-    const { status, page = 1, limit = 5 } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Invalid Page number or Limit number')
-    }
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {}
-    const validateStatus = [
-        'PENDING',
-        'ACCEPTED',
-        'PREPARING',
-        'READY',
-        'DELIVERED',
-        'CANCELLED'
-    ]
+  const { status, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid Page number or Limit number");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  const validateStatus = [
+    "PENDING",
+    "ACCEPTED",
+    "PREPARING",
+    "READY",
+    "DELIVERED",
+    "CANCELLED",
+  ];
 
-    if (status && !validateStatus.includes(status)) {
-        throw new ApiError(400, 'Invalid status')
-    } else if (status && validateStatus.includes(status)) {
-        filter.orderStatus = status
-    }
+  if (status && !validateStatus.includes(status)) {
+    throw new ApiError(400, "Invalid status");
+  } else if (status && validateStatus.includes(status)) {
+    filter.orderStatus = status;
+  }
 
-    const [orders, totalOrders] = await Promise.all([
-        orderModel
-            .find(filter)
-            .skip(skip)
-            .limit(limitNumber)
-            .populate(
-                {
-                    path: 'user',
-                    select: 'username'
-                }
-            ).sort({ createdAt: -1 }),
+  const [orders, totalOrders] = await Promise.all([
+    orderModel
+      .find(filter)
+      .skip(skip)
+      .limit(limitNumber)
+      .populate({
+        path: "user",
+        select: "username",
+      })
+      .sort({ createdAt: -1 }),
 
-        orderModel.countDocuments(filter)
-    ])
+    orderModel.countDocuments(filter),
+  ]);
 
-    const totalPages = Math.ceil(totalOrders / limitNumber)
+  const totalPages = Math.ceil(totalOrders / limitNumber);
 
-    return res.status(200).json(new ApiResponse(200, 'Order details fetched successfully', {
-        orders,
-        'pagination': {
-            'page': pageNumber,
-            'limit': limitNumber,
-            totalOrders,
-            totalPages,
-
-        }
-    }))
+  return res.status(200).json(
+    new ApiResponse(200, "Order details fetched successfully", {
+      orders,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalOrders,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const getOrderById = asyncHandler(async (req, res) => {
-    const orderId = req.params.id
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-        throw new ApiError(400, 'Invalid OrderID')
-    }
+  const orderId = req.params.id;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid OrderID");
+  }
 
-    const order = await orderModel
-        .findById(orderId)
-        .populate([
-            {
-                path: 'user',
-                select: 'username'
-            },
-            {
-                path: 'items.menuItem',
-                select: 'name price image'
-            }
-        ])
-    if (!order) {
-        throw new ApiError(404, 'Order not found')
-    }
+  const order = await orderModel.findById(orderId).populate([
+    {
+      path: "user",
+      select: "username",
+    },
+    {
+      path: "items.menuItem",
+      select: "name price image",
+    },
+  ]);
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'Order fetched successfully', { order }))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Order fetched successfully", { order }));
 });
 
 const configSettings = asyncHandler(async (req, res) => {
-    let settings = await platformSettingsModel.findOne()
-    if (!settings) {
-        settings = await platformSettingsModel.create({})
-    }
+  let settings = await platformSettingsModel.findOne();
+  if (!settings) {
+    settings = await platformSettingsModel.create({});
+  }
 
-    return res.status(200).json(new ApiResponse('Settings configured successfully', settings))
+  return res
+    .status(200)
+    .json(new ApiResponse("Settings configured successfully", settings));
 });
 
 const editSettings = asyncHandler(async (req, res) => {
-    const settings = await platformSettingsModel.findOne()
-    if (!settings) {
-        throw new ApiError(404, 'Platform settings not found')
+  const settings = await platformSettingsModel.findOne();
+  if (!settings) {
+    throw new ApiError(404, "Platform settings not found");
+  }
+
+  const updates = req.body;
+
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      settings[key] = value;
     }
+  });
 
-    const updates = req.body
+  if (settings.freeDeliveryAbove < settings.minimumOrderValue) {
+    throw new ApiError(
+      400,
+      "Minimum order value cannot be above free delivery order value",
+    );
+  }
 
+  settings.updatedBy = req.user.id;
+  await settings.save();
 
-    Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined) {
-            settings[key] = value;
-        }
-    });
-
-    if (settings.freeDeliveryAbove < settings.minimumOrderValue) {
-        throw new ApiError(400, 'Minimum order value cannot be above free delivery order value')
-    }
-
-    settings.updatedBy = req.user.id
-    await settings.save()
-
-    return res.status(200).json(new ApiResponse(200, 'Settings updated successfully', settings))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Settings updated successfully", settings));
 });
 
 const createCoupons = asyncHandler(async (req, res) => {
-    let {
-        code,
-        discountType,
-        discountValue,
-        minimumOrderValue,
-        maximumDiscount,
-        expiryDate,
-        usageLimit
-    } = req.body
+  let {
+    code,
+    discountType,
+    discountValue,
+    minimumOrderValue,
+    maximumDiscount,
+    expiryDate,
+    usageLimit,
+  } = req.body;
 
-    const normalisedCode = code.trim().toUpperCase()
-    const isExisting = await couponModel.findOne({ code: normalisedCode })
-    if (isExisting) {
-        throw new ApiError(409, 'Coupon already exists')
+  const normalisedCode = code.trim().toUpperCase();
+  const isExisting = await couponModel.findOne({ code: normalisedCode });
+  if (isExisting) {
+    throw new ApiError(409, "Coupon already exists");
+  }
+
+  const expiry = new Date(expiryDate);
+  if (expiry <= new Date()) {
+    throw new ApiError(400, "Coupon already expired");
+  }
+
+  if (discountType === "PERCENTAGE" && maximumDiscount <= 0) {
+    throw new ApiError(
+      400,
+      "Maximum discount is required for percentage coupons",
+    );
+  }
+  if (discountType === "PERCENTAGE") {
+    if (discountValue > 100) {
+      throw new ApiError(400, "Percentage cannot exceed 100%");
     }
+  } else if (discountType === "FIXED") {
+    maximumDiscount = 0;
+  }
 
-    const expiry = new Date(expiryDate)
-    if (expiry <= new Date()) {
-        throw new ApiError(400, 'Coupon already expired')
-    }
+  const coupon = await couponModel.create({
+    code: normalisedCode,
+    discountType,
+    discountValue,
+    minimumOrderValue,
+    maximumDiscount,
+    expiryDate,
+    usageLimit,
+    createdBy: req.user.id,
+  });
 
-
-    if (discountType === 'PERCENTAGE' && maximumDiscount <= 0) {
-        throw new ApiError(400, 'Maximum discount is required for percentage coupons')
-    }
-    if (discountType === 'PERCENTAGE') {
-        if (discountValue > 100) {
-            throw new ApiError(400, 'Percentage cannot exceed 100%')
-        }
-    } else if (discountType === 'FIXED') {
-        maximumDiscount = 0
-    }
-
-
-    const coupon = await couponModel.create({
-        code: normalisedCode,
-        discountType,
-        discountValue,
-        minimumOrderValue,
-        maximumDiscount,
-        expiryDate,
-        usageLimit,
-        createdBy: req.user.id
-    })
-
-    return res.status(201).json(new ApiResponse(201, 'Coupon created successfully', coupon))
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Coupon created successfully", coupon));
 });
 
 const getAllCoupons = asyncHandler(async (req, res) => {
-    const {
-        search,
-        isActive,
-        discountType,
-        page = 1,
-        limit = 5
-    } = req.query
+  const { search, isActive, discountType, page = 1, limit = 5 } = req.query;
 
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Page or limit number cannot be less than 1')
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Page or limit number cannot be less than 1");
+  }
+
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  if (search) {
+    filter.code = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+
+  if (isActive === "true") {
+    filter.isActive = true;
+  } else if (isActive === "false") {
+    filter.isActive = false;
+  }
+
+  const allowedTypes = ["PERCENTAGE", "FIXED"];
+
+  if (discountType) {
+    if (!discountType.includes(allowedTypes)) {
+      throw new ApiError(400, "Invalid discount type");
     }
+    filter.discountType = discountType;
+  }
 
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {}
-    if (search) {
-        filter.code = {
-            $regex: search,
-            $options: 'i'
-        }
-    }
+  const [coupons, totalCoupons] = await Promise.all([
+    couponModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .populate({
+        path: "createdBy",
+        select: "username",
+      }),
 
-    if (isActive === 'true') {
-        filter.isActive = true
-    } else if (isActive === 'false') {
-        filter.isActive = false
-    }
+    couponModel.countDocuments(filter),
+  ]);
 
-    const allowedTypes = ['PERCENTAGE', 'FIXED']
+  const totalPages = Math.ceil(totalCoupons / limitNumber);
 
-    if (discountType) {
-        if (!discountType.includes(allowedTypes)) {
-            throw new ApiError(400, 'Invalid discount type')
-        }
-        filter.discountType = discountType
-    }
-
-    const [coupons, totalCoupons] = await Promise.all([
-        couponModel
-            .find(filter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limitNumber)
-            .populate({
-                path: 'createdBy',
-                select: 'username'
-            }),
-
-        couponModel.countDocuments(filter)
-
-    ])
-
-    const totalPages = Math.ceil(totalCoupons / limitNumber)
-
-    if (coupons.length === 0) {
-        return res.status(200).json(new ApiResponse(200, 'No coupons to fetch', {
-            coupons,
-            'pagination': {
-                'page': pageNumber,
-                'limit': limitNumber,
-                totalCoupons,
-                totalPages
-            }
-        }))
-    }
-
-    return res.status(200).json(new ApiResponse(200, 'Coupons fetched successfully', {
+  if (coupons.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No coupons to fetch", {
         coupons,
-        'pagination': {
-            'page': pageNumber,
-            'limit': limitNumber,
-            totalCoupons,
-            totalPages
-        }
-    }))
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalCoupons,
+          totalPages,
+        },
+      }),
+    );
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Coupons fetched successfully", {
+      coupons,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalCoupons,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const getCouponById = asyncHandler(async (req, res) => {
-    const { couponId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(couponId)) {
-        throw new ApiError(400, 'Invalid coupon ID')
-    }
+  const { couponId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(couponId)) {
+    throw new ApiError(400, "Invalid coupon ID");
+  }
 
-    const coupon = await couponModel
-        .findById(couponId)
-        .populate({
-            path: 'createdBy',
-            select: 'username'
-        })
-    if (!coupon) {
-        throw new ApiError(404, 'Coupon not found')
-    }
+  const coupon = await couponModel.findById(couponId).populate({
+    path: "createdBy",
+    select: "username",
+  });
+  if (!coupon) {
+    throw new ApiError(404, "Coupon not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'Coupon fetched successfully', coupon))
-
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Coupon fetched successfully", coupon));
 });
 
 const updateCoupon = asyncHandler(async (req, res) => {
-    const { couponId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(couponId)) {
-        throw new ApiError(400, 'Invalid coupon ID`')
+  const { couponId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(couponId)) {
+    throw new ApiError(400, "Invalid coupon ID`");
+  }
+
+  const coupon = await couponModel.findById(couponId);
+  if (!coupon) {
+    throw new ApiError(404, "Coupon not found");
+  }
+
+  const updates = req.body;
+
+  if (updates.code) {
+    const normalisedCode = updates.code.trim().toUpperCase();
+    const isExisting = await couponModel.findOne({
+      code: normalisedCode,
+      _id: { $ne: couponId },
+    });
+
+    if (isExisting) {
+      throw new ApiError(409, "Coupon already exists");
     }
+  }
 
-    const coupon = await couponModel.findById(couponId)
-    if (!coupon) {
-        throw new ApiError(404, 'Coupon not found')
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      coupon[key] = value;
     }
+  });
 
-    const updates = req.body
+  const expiry = new Date(coupon.expiryDate);
+  if (expiry <= new Date()) {
+    throw new ApiError(400, "Coupon already expired");
+  }
 
-    if (updates.code) {
-        const normalisedCode = updates.code.trim().toUpperCase()
-        const isExisting = await couponModel.findOne({
-            code: normalisedCode,
-            _id: { $ne: couponId }
-        })
+  if (coupon.discountType === "PERCENTAGE") {
+    if (coupon.discountValue > 100)
+      throw new ApiError(400, "Discount value cannot be greater than 100");
 
-        if (isExisting) {
-            throw new ApiError(409, 'Coupon already exists')
-        }
-    }
+    if (coupon.maximumDiscount < 1)
+      throw new ApiError(
+        400,
+        "Maximum discount anount should be greater than 0",
+      );
+  } else if (coupon.discountType === "FIXED") {
+    coupon.maximumDiscount = 0;
+  }
 
-    Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined) {
-            coupon[key] = value
-        }
-    })
+  await coupon.save();
 
-    const expiry = new Date(coupon.expiryDate)
-    if (expiry <= new Date()) {
-        throw new ApiError(400, 'Coupon already expired')
-    }
-
-    if (coupon.discountType === 'PERCENTAGE') {
-        if (coupon.discountValue > 100) throw new ApiError(400, 'Discount value cannot be greater than 100')
-
-        if (coupon.maximumDiscount < 1) throw new ApiError(400, 'Maximum discount anount should be greater than 0')
-    } else if (coupon.discountType === 'FIXED') {
-        coupon.maximumDiscount = 0
-    }
-
-    await coupon.save()
-
-    return res.status(200).json(new ApiResponse(200, 'Coupon updated successfully', coupon))
-
-
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Coupon updated successfully", coupon));
 });
 
 const updateCouponStatus = asyncHandler(async (req, res) => {
-    const { couponId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(couponId)) {
-        throw new ApiError(400, 'Coupon ID is invalid')
-    }
-    const coupon = await couponModel.findById(couponId)
-    if (!coupon) {
-        throw new ApiError(404, 'Coupon is not existing')
-    }
+  const { couponId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(couponId)) {
+    throw new ApiError(400, "Coupon ID is invalid");
+  }
+  const coupon = await couponModel.findById(couponId);
+  if (!coupon) {
+    throw new ApiError(404, "Coupon is not existing");
+  }
 
-    coupon.isActive = !coupon.isActive
-    await coupon.save()
+  coupon.isActive = !coupon.isActive;
+  await coupon.save();
 
-    return res.status(200).json(new ApiResponse(200, 'Coupon status updated successfully', {
-        'currentCouponState': coupon.isActive
-    }))
+  return res.status(200).json(
+    new ApiResponse(200, "Coupon status updated successfully", {
+      currentCouponState: coupon.isActive,
+    }),
+  );
 });
 
 const createAnnouncements = asyncHandler(async (req, res) => {
-    const {
-        title,
-        description,
-        priority,
-        expiresAt
-    } = req.body
+  const { title, description, priority, expiresAt } = req.body;
 
-    const expiry = new Date(expiresAt)
-    if (expiry <= new Date()) {
-        throw new ApiError(400, 'Expiry should be in the future')
-    }
-    if (priority < 1) {
-        throw new ApiError(400, 'Priority should be greater than or equal to 1')
-    }
+  const expiry = new Date(expiresAt);
+  if (expiry <= new Date()) {
+    throw new ApiError(400, "Expiry should be in the future");
+  }
+  if (priority < 1) {
+    throw new ApiError(400, "Priority should be greater than or equal to 1");
+  }
 
-    const announcement = await announcementModel.create({
-        title,
-        description,
-        priority,
-        expiresAt,
-        createdBy: req.user.id
-    })
+  const announcement = await announcementModel.create({
+    title,
+    description,
+    priority,
+    expiresAt,
+    createdBy: req.user.id,
+  });
 
-    return res.status(201).json(new ApiResponse(201, 'Announcement created succesfully', announcement))
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(201, "Announcement created succesfully", announcement),
+    );
 });
 
 const getAnnouncements = asyncHandler(async (req, res) => {
-    const { search, page = 1, limit = 5, isActive } = req.query
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Page number or limit number is invalid')
-    }
-    const skip = (pageNumber - 1) * limitNumber
+  const { search, page = 1, limit = 5, isActive } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Page number or limit number is invalid");
+  }
+  const skip = (pageNumber - 1) * limitNumber;
 
-    let filter = {}
-    if (search) {
-        filter.title = {
-            $regex: search,
-            $options: "i"
-        }
-    }
+  let filter = {};
+  if (search) {
+    filter.title = {
+      $regex: search,
+      $options: "i",
+    };
+  }
 
-    if (isActive === 'true')
-        filter.isActive = true
-    else if (isActive === 'false')
-        filter.isActive = false
+  if (isActive === "true") filter.isActive = true;
+  else if (isActive === "false") filter.isActive = false;
 
-    const [announcements, totalAnnouncements] = await Promise.all([
-        announcementModel
-            .find(filter)
-            .sort({
-                priority: -1,
-                createdAt: -1
-            })
-            .skip(skip)
-            .limit(limitNumber)
-            .populate({
-                path: 'createdBy',
-                select: 'username'
-            }),
+  const [announcements, totalAnnouncements] = await Promise.all([
+    announcementModel
+      .find(filter)
+      .sort({
+        priority: -1,
+        createdAt: -1,
+      })
+      .skip(skip)
+      .limit(limitNumber)
+      .populate({
+        path: "createdBy",
+        select: "username",
+      }),
 
-        announcementModel.countDocuments(filter)
-    ])
+    announcementModel.countDocuments(filter),
+  ]);
 
-    const totalPages = Math.ceil(totalAnnouncements / limitNumber)
+  const totalPages = Math.ceil(totalAnnouncements / limitNumber);
 
-    if (announcements.length === 0) {
-        return res.status(200).json(new ApiResponse(200, 'No announcements fetched', {
-            announcements,
-            'pagination': {
-                'page': pageNumber,
-                'limit': limitNumber,
-                totalAnnouncements,
-                totalPages
-            }
-        }))
-    }
-
-    return res.status(200).json(new ApiResponse(200, 'Announcements fetched successfully', {
+  if (announcements.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No announcements fetched", {
         announcements,
-        'pagination': {
-            'page': pageNumber,
-            'limit': limitNumber,
-            totalAnnouncements,
-            totalPages
-        }
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalAnnouncements,
+          totalPages,
+        },
+      }),
+    );
+  }
 
-    }))
-
-
+  return res.status(200).json(
+    new ApiResponse(200, "Announcements fetched successfully", {
+      announcements,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalAnnouncements,
+        totalPages,
+      },
+    }),
+  );
 });
 
 const getAnnouncementById = asyncHandler(async (req, res) => {
-    const { announcementId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
-        throw new ApiError(400, 'Announcement ID is invalid')
-    }
+  const { announcementId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+    throw new ApiError(400, "Announcement ID is invalid");
+  }
 
-    const announcement = await announcementModel
-        .findById(announcementId)
-        .populate({
-            path: 'createdBy',
-            select: 'username'
-        })
-    if (!announcement) {
-        throw new ApiError(404, 'Announcement not found')
-    }
+  const announcement = await announcementModel
+    .findById(announcementId)
+    .populate({
+      path: "createdBy",
+      select: "username",
+    });
+  if (!announcement) {
+    throw new ApiError(404, "Announcement not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200, 'Announcement fetched successfully', announcement))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Announcement fetched successfully", announcement),
+    );
 });
 
 const updateAnnouncement = asyncHandler(async (req, res) => {
-    const { announcementId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
-        throw new ApiError(400, 'Invalid announcement ID')
+  const { announcementId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+    throw new ApiError(400, "Invalid announcement ID");
+  }
+
+  const announcement = await announcementModel.findById(announcementId);
+  if (!announcement) {
+    throw new ApiError(404, "Announcement not found");
+  }
+
+  const updates = req.body;
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) announcement[key] = value;
+  });
+
+  if (updates.expiresAt) {
+    const expiry = new Date(updates.expiresAt);
+    if (expiry <= new Date()) {
+      throw new ApiError(400, "Expiry date must be in future");
     }
+  }
 
-    const announcement = await announcementModel.findById(announcementId)
-    if (!announcement) {
-        throw new ApiError(404, 'Announcement not found')
-    }
+  if (updates.priority !== undefined) {
+    if (updates.priority < 1)
+      throw new ApiError(400, "Priority cannot be less than 1");
+  }
 
-    const updates = req.body
-    Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined)
-            announcement[key] = value
-    })
+  await announcement.save();
 
-    if (updates.expiresAt) {
-        const expiry = new Date(updates.expiresAt)
-        if (expiry <= new Date()) {
-            throw new ApiError(400, 'Expiry date must be in future')
-        }
-    }
-
-    if (updates.priority !== undefined) {
-        if (updates.priority < 1)
-            throw new ApiError(400, 'Priority cannot be less than 1')
-    }
-
-    await announcement.save()
-
-    return res.status(200).json(new ApiResponse(200, 'Announcement updated successfully', announcement))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Announcement updated successfully", announcement),
+    );
 });
 
 const updateAnnouncementStatus = asyncHandler(async (req, res) => {
-    const { announcementId } = req.params
-    if (!mongoose.Types.ObjectId.isValid(announcementId)) {
-        throw new ApiError(400, 'Invalid announcement ID')
-    }
+  const { announcementId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+    throw new ApiError(400, "Invalid announcement ID");
+  }
 
-    const announcement = await announcementModel.findById(announcementId)
-    if (!announcement) {
-        throw new ApiError(404, 'Announcement not found')
-    }
+  const announcement = await announcementModel.findById(announcementId);
+  if (!announcement) {
+    throw new ApiError(404, "Announcement not found");
+  }
 
-    announcement.isActive = !announcement.isActive
-    await announcement.save()
+  announcement.isActive = !announcement.isActive;
+  await announcement.save();
 
-    return res.status(200).json(new ApiResponse(200, 'Announcement status updated successfully', announcement.isActive))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Announcement status updated successfully",
+        announcement.isActive,
+      ),
+    );
 });
 
 const createBanner = asyncHandler(async (req, res) => {
-    const {
-        title,
-        priority,
-        redirectType,
-        redirectedId
-    } = req.body
+  const { title, priority, redirectType, redirectedId } = req.body;
 
-    if (redirectType !== 'NONE' && !redirectedId) {
-        throw new ApiError(400, 'Redirect ID is required')
-    }
+  if (redirectType !== "NONE" && !redirectedId) {
+    throw new ApiError(400, "Redirect ID is required");
+  }
 
-    const imageLocalPath = req.file?.path
-    if (!imageLocalPath) {
-        throw new ApiError(400, "Menu image is required")
-    }
+  const imageLocalPath = req.file?.path;
+  if (!imageLocalPath) {
+    throw new ApiError(400, "Menu image is required");
+  }
 
-    const imageUrl = await uploadOnCloudinary(
-        imageLocalPath
-    )
+  const imageUrl = await uploadOnCloudinary(imageLocalPath);
 
-    const banner = await bannerModel.create({
-        title,
-        priority,
-        redirectType,
-        redirectedId,
-        image: imageUrl,
-        createdBy: req.user.id
-    })
+  const banner = await bannerModel.create({
+    title,
+    priority,
+    redirectType,
+    redirectedId,
+    image: imageUrl,
+    createdBy: req.user.id,
+  });
 
-    return res.status(201).json(new ApiResponse(201, 'Banner created successfully', banner))
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Banner created successfully", banner));
 });
 
 const getAllBanners = asyncHandler(async (req, res) => {
-    const {
-        search,
-        isActive,
-        page = 1,
-        limit = 5
-    } = req.query
+  const { search, isActive, page = 1, limit = 5 } = req.query;
 
-    const pageNumber = parseInt(page) || 1
-    const limitNumber = parseInt(limit) || 5
-    if (pageNumber < 1 || limitNumber < 1) {
-        throw new ApiError(400, 'Page or limit number cannot be less than 1')
-    }
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Page or limit number cannot be less than 1");
+  }
 
-    const skip = (pageNumber - 1) * limitNumber
-    let filter = {}
-    if (search) {
-        filter.title = {
-            $regex: search,
-            $options: 'i'
-        }
-    }
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  if (search) {
+    filter.title = {
+      $regex: search,
+      $options: "i",
+    };
+  }
 
-    if (isActive === 'true') {
-        filter.isActive = true
-    } else if (isActive === 'false') {
-        filter.isActive = false
-    }
+  if (isActive === "true") {
+    filter.isActive = true;
+  } else if (isActive === "false") {
+    filter.isActive = false;
+  }
 
-    const [banners, totalBanners] = await Promise.all([
-        bannerModel
-            .find(filter)
-            .sort({
-                priority: -1,
-                createdAt: -1
-            })
-            .skip(skip)
-            .limit(limitNumber)
-            .populate({
-                path: 'createdBy',
-                select: 'username'
-            }),
+  const [banners, totalBanners] = await Promise.all([
+    bannerModel
+      .find(filter)
+      .sort({
+        priority: -1,
+        createdAt: -1,
+      })
+      .skip(skip)
+      .limit(limitNumber)
+      .populate({
+        path: "createdBy",
+        select: "username",
+      }),
 
-        bannerModel.countDocuments(filter)
-    ])
+    bannerModel.countDocuments(filter),
+  ]);
 
-    const totalPages = Math.ceil(totalBanners / limitNumber)
-    if (banners.length === 0) {
-        return res.status(200).json(new ApiResponse(200, 'No banners to show', {
-            banners,
-            'pagination': {
-                'page': pageNumber,
-                'limit': limitNumber,
-                totalBanners,
-                totalPages,
+  const totalPages = Math.ceil(totalBanners / limitNumber);
+  if (banners.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No banners to show", {
+        banners,
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalBanners,
+          totalPages,
+        },
+      }),
+    );
+  }
 
-            }
-        }))
-    }
-
-     return res.status(200).json(new ApiResponse(200, 'Banners fetched successfully', {
-            banners,
-            'pagination': {
-                'page': pageNumber,
-                'limit': limitNumber,
-                totalBanners,
-                totalPages,
-
-            }
-        }))
+  return res.status(200).json(
+    new ApiResponse(200, "Banners fetched successfully", {
+      banners,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalBanners,
+        totalPages,
+      },
+    }),
+  );
 });
 
-const getBannerById = asyncHandler(async(req,res)=>{
-    const {bannerId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(bannerId)){
-        throw new ApiError(400,'Banner ID is invalid')
-    }
+const getBannerById = asyncHandler(async (req, res) => {
+  const { bannerId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(bannerId)) {
+    throw new ApiError(400, "Banner ID is invalid");
+  }
 
-    const banner = await bannerModel
-        .findById(bannerId)
-        .populate({
-            path:'createdBy',
-            select:'username'
-        })
-    if(!banner){
-        throw new ApiError(404,'Banner not found')
-    }
+  const banner = await bannerModel.findById(bannerId).populate({
+    path: "createdBy",
+    select: "username",
+  });
+  if (!banner) {
+    throw new ApiError(404, "Banner not found");
+  }
 
-    return res.status(200).json(new ApiResponse(200,'Banner fetched successfully',banner))
-
-
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Banner fetched successfully", banner));
 });
 
-const updateBanner = asyncHandler(async(req,res)=>{
-    const {bannerId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(bannerId)){
-        throw new ApiError(400,'Banner ID is invalid')
+const updateBanner = asyncHandler(async (req, res) => {
+  const { bannerId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(bannerId)) {
+    throw new ApiError(400, "Banner ID is invalid");
+  }
+
+  const banner = await bannerModel.findById(bannerId);
+  if (!banner) {
+    throw new ApiError(404, "Banner not found");
+  }
+
+  const updates = req.body;
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      banner[key] = value;
     }
+  });
 
-    const banner = await bannerModel.findById(bannerId)
-    if(!banner){
-        throw new ApiError(404,'Banner not found')
+  const imageLocalPath = req.file?.path;
+  if (!imageLocalPath) {
+    if (updates.redirectType !== "NONE" && !updates.redirectedId) {
+      throw new ApiError(400, "Redirect ID is required");
     }
+    await banner.save();
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Banner updated successfully", banner));
+  }
 
-    const updates = req.body
-    Object.entries(updates).forEach(([key,value])=>{
-        if(value!==undefined){
-            banner[key] = value
-        }
-    })
+  if (updates.redirectType !== "NONE" && !updates.redirectedId) {
+    throw new ApiError(400, "Redirect ID is required");
+  }
 
-    const imageLocalPath = req.file?.path
-    if(!imageLocalPath){
-        if(updates.redirectType!=='NONE' && !updates.redirectedId){
-            throw new ApiError(400, 'Redirect ID is required')
-        }
-        await banner.save()
-        return res.status(200).json(new ApiResponse(200,'Banner updated successfully',banner))
-    }
-
-    if(updates.redirectType!=='NONE' && !updates.redirectedId){
-            throw new ApiError(400, 'Redirect ID is required')
-        }
-
-    const imageUrl = await uploadOnCloudinary(imageLocalPath)
-    banner.image = imageUrl
-    await banner.save()
-    return res.status(200).json(new ApiResponse(200,'Banner updated successfully',banner))
+  const imageUrl = await uploadOnCloudinary(imageLocalPath);
+  banner.image = imageUrl;
+  await banner.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Banner updated successfully", banner));
 });
 
-const updateBannerStatus = asyncHandler(async(req,res)=>{
-    const {bannerId} = req.params
-    if(!mongoose.Types.ObjectId.isValid(bannerId)){
-        throw new ApiError(400,'Banner ID is invalid')
-    }
-    const banner = await bannerModel.findById(bannerId)
-    if(!banner){
-        throw new ApiError(404,'Banner not found')
-    }
+const updateBannerStatus = asyncHandler(async (req, res) => {
+  const { bannerId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(bannerId)) {
+    throw new ApiError(400, "Banner ID is invalid");
+  }
+  const banner = await bannerModel.findById(bannerId);
+  if (!banner) {
+    throw new ApiError(404, "Banner not found");
+  }
 
-    banner.isActive = !banner.isActive
-    await banner.save()
+  banner.isActive = !banner.isActive;
+  await banner.save();
 
-    return res.status(200).json(new ApiError(200,'Banner status updated successfully',banner.isActive))
-})
+  return res
+    .status(200)
+    .json(
+      new ApiError(200, "Banner status updated successfully", banner.isActive),
+    );
+});
 
+const topRestaurants = asyncHandler(async (req, res) => {
+  const topRestaurants = await topRestaurantsPipeline();
+  if (topRestaurants.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "No restaurants found", topRestaurants));
+  }
 
-
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Top restaurants fetched successfully",
+        topRestaurants,
+      ),
+    );
+});
 
 export default {
-    viewAdminDashboard,
-    viewUsers,
-    viewVendors,
-    viewRestaurants,
-    blockUser,
-    unBlockUser,
-    suspendRestaurant,
-    activateRestaurant,
-    getAllOrders,
-    getOrderById,
-    configSettings,
-    editSettings,
-    createCoupons,
-    getAllCoupons,
-    getCouponById,
-    updateCoupon,
-    updateCouponStatus,
-    createAnnouncements,
-    getAnnouncements,
-    getAnnouncementById,
-    updateAnnouncement,
-    updateAnnouncementStatus,
-    createBanner,
-    getAllBanners,
-    getBannerById,
-    updateBanner,
-    updateBannerStatus
-}
+  viewAdminDashboard,
+  viewUsers,
+  viewVendors,
+  viewRestaurants,
+  blockUser,
+  unBlockUser,
+  suspendRestaurant,
+  activateRestaurant,
+  getAllOrders,
+  getOrderById,
+  configSettings,
+  editSettings,
+  createCoupons,
+  getAllCoupons,
+  getCouponById,
+  updateCoupon,
+  updateCouponStatus,
+  createAnnouncements,
+  getAnnouncements,
+  getAnnouncementById,
+  updateAnnouncement,
+  updateAnnouncementStatus,
+  createBanner,
+  getAllBanners,
+  getBannerById,
+  updateBanner,
+  updateBannerStatus,
+  topRestaurants,
+};

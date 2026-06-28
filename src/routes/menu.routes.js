@@ -5,22 +5,54 @@ import roleMiddleware from "../middlewares/role.middleware.js";
 import menuController from "../controllers/menu.controllers.js";
 import { menuUpdateValidationRules } from "../validators/menuUpdate.validators.js";
 import { menuStatusValidationRule } from "../validators/menuStatus.validators.js";
-import upload from "../middlewares/multer.middlewares.js"
+import upload from "../middlewares/multer.middlewares.js";
 import { blockMiddleware } from "../middlewares/block.middlewares.js";
-import { restaurantSuspensionMiddleware } from '../middlewares/restaurantSuspension.middlewares.js'
+import { restaurantSuspensionMiddleware } from "../middlewares/restaurantSuspension.middlewares.js";
 const menuRouter = Router();
 
-menuRouter.post('/:restaurantId/menu', authMiddleware, roleMiddleware("vendor"), blockMiddleware, restaurantSuspensionMiddleware, upload.single('image'), menuValidationRules, menuController.createMenuItem);
+menuRouter.post(
+  "/:restaurantId/menu",
+  authMiddleware,
+  roleMiddleware("vendor"),
+  blockMiddleware,
+  restaurantSuspensionMiddleware,
+  upload.single("image"),
+  menuValidationRules,
+  menuController.createMenuItem,
+);
 
-menuRouter.get('/:restaurantId/menu', menuController.getRestaurantMenu);
+menuRouter.get("/:restaurantId/menu", menuController.getRestaurantMenu);
 
-menuRouter.get('/menu/:id', menuController.getMenuItemById);
+menuRouter.get("/menu/:id", menuController.getMenuItemById);
 
-menuRouter.patch('/menu/:id', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, upload.single('image'), menuUpdateValidationRules, menuController.updateMenuItem);
+menuRouter.patch(
+  "/menu/:id",
+  authMiddleware,
+  roleMiddleware("vendor"),
+  blockMiddleware,
+  restaurantSuspensionMiddleware,
+  upload.single("image"),
+  menuUpdateValidationRules,
+  menuController.updateMenuItem,
+);
 
-menuRouter.patch('/menu/:id/status', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, menuStatusValidationRule, menuController.updateMenuStatus);
+menuRouter.patch(
+  "/menu/:id/status",
+  authMiddleware,
+  roleMiddleware("vendor"),
+  blockMiddleware,
+  restaurantSuspensionMiddleware,
+  menuStatusValidationRule,
+  menuController.updateMenuStatus,
+);
 
-menuRouter.delete('/menu/:id', authMiddleware, roleMiddleware('vendor'), blockMiddleware, restaurantSuspensionMiddleware, menuController.deleteMenuItem);
-
+menuRouter.delete(
+  "/menu/:id",
+  authMiddleware,
+  roleMiddleware("vendor"),
+  blockMiddleware,
+  restaurantSuspensionMiddleware,
+  menuController.deleteMenuItem,
+);
 
 export default menuRouter;
