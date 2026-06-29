@@ -136,7 +136,7 @@ const createOrder = asyncHandler(async (req, res) => {
             restaurant: restaurantId,
             restaurantName,
             items: orderItems,
-            finalAmount,
+            totalAmount:finalAmount,
             orderNumber: generateOrderNumber(),
             paymentMethod,
             coupon: couponId,
@@ -186,6 +186,11 @@ const createOrder = asyncHandler(async (req, res) => {
       }),
     );
   }
+
+  const platformSettings = await platformSettingsModel.findOne();
+    if (!platformSettings) {
+      throw new ApiError(404, "Platform settings not found");
+    }
 
   const gstPercentage = platformSettings.gstPercentage;
   const gstAmount = Math.round((totalAmount * gstPercentage) / 100);
@@ -549,7 +554,7 @@ const applyCoupon = asyncHandler(async (req, res) => {
 });
 
 const removeCoupon = asyncHandler(async(req,res)=>{
-    
+
 })
 
 export default {

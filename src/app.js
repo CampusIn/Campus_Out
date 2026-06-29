@@ -10,6 +10,7 @@ import reviewRoute from "./routes/review.routes.js";
 import vendorRoute from "./routes/vendor.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import deliveryRouter from "./routes/deliveryPartner.routes.js";
+import homePageRouter from "./routes/homepageCMS.routes.js";
 import ApiError from "./utils/apiErrors.js";
 import cors from "cors";
 
@@ -34,6 +35,7 @@ app.use("/api/user", reviewRoute);
 app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/vendor", vendorRoute);
+app.use('/api/user/homepage',homePageRouter)
 
 app.use((err, req, res, next) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;

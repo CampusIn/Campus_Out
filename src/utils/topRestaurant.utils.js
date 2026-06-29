@@ -27,7 +27,7 @@ const topRestaurantsPipeline = async () => {
       },
     },
     {
-      $unwind: "$restaurant",
+      $unwind: "$restaurantDetails",
     },
     {
       $project: {
