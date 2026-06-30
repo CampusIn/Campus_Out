@@ -82,6 +82,46 @@ if (!process.env.CLOUDINARY_NAME) {
   }
 }
 
+
+if (!process.env.GOOGLE_CLIENT_ID) {
+  try {
+    throw new Error("GOOGLE_CLIENT_ID is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  try {
+    throw new Error("GOOGLE_CLIENT_SECRET is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+if (!process.env.GOOGLE_CALLBACK_URL) {
+  try {
+    throw new Error("GOOGLE_CALLBACK_URL is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+if (!process.env.CLIENT_URL) {
+  try {
+    throw new Error("CLIENT_URL is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+
+
+
 const config = {
   PORT: process.env.PORT,
   MONGO_URI: process.env.MONGO_URI,
@@ -93,6 +133,10 @@ const config = {
   CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET:process.env.GOOGLE_CLIENT_SECRET,
+  GOOGLE_CALLBACK_URL:process.env.GOOGLE_CALLBACK_URL,
+  CLIENT_URL:process.env.CLIENT_URL
 };
 
 export default config;
