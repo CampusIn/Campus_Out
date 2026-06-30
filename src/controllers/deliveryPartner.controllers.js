@@ -47,12 +47,23 @@ const assignPartner = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid Delivery Partner Id");
   }
 
-  const order = await orderModel.findById(orderId);
+  const order = await orderModel.findById(orderId).populate({
+    path: "restaurant",
+    select: "owner",
+  });
   if (!order) {
     throw new ApiError(404, "Order does not exists");
   }
-  if (order.orderStatus !== "READY") {
-    throw new ApiError(400, "Order is not ready for delivery");
+  if (order.restaurant.owner.toString() !== req.user.id) {
+    throw new ApiError(403, "Forbidden, you are not the owner of restaurant");
+  }
+
+  const assignableStatuses = ["CONFIRMED", "PREPARING", "READY"];
+  if (!assignableStatuses.includes(order.orderStatus)) {
+    throw new ApiError(
+      400,
+      `Order must be CONFIRMED, PREPARING, or READY before assigning delivery. Current status: ${order.orderStatus}`,
+    );
   }
   if (order.deliveryPartner) {
     throw new ApiError(400, "Delivery partner already assigned");
