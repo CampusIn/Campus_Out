@@ -17,9 +17,12 @@ import cors from "cors";
 import config from "./config/config.js";
 
 const app = express();
-const allowedOrigins = ["http://localhost:5173", config.CLIENT_URL].filter(
-  Boolean,
-);
+const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://campus-out-frontend.vercel.app",
+  normalizeOrigin(config.CLIENT_URL),
+].filter(Boolean);
 
 app.use(express.json());
 app.use(morgan("dev"));
@@ -27,7 +30,13 @@ app.use(cookieParser());
 app.use(passport.initialize());
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    },
     credentials: true,
   }),
 );
