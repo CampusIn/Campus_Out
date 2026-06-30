@@ -13,7 +13,7 @@ import couponUsageModel from "../models/couponUsage.models.js";
 
 //User order section Start
 const createOrder = asyncHandler(async (req, res) => {
-  const { paymentMethod, couponId } = req.body;
+  const { paymentMethod, couponId, customerPhone, deliveryAddress } = req.body;
   if (paymentMethod !== "COD" && paymentMethod !== "PAY_ON_PICKUP") {
     throw new ApiError(400, "Choose a payment method");
   }
@@ -142,6 +142,8 @@ const createOrder = asyncHandler(async (req, res) => {
             coupon: couponId,
             couponCode: coupon.code,
             discountAmount: couponDiscount,
+            customerPhone: customerPhone || undefined,
+            deliveryAddress: deliveryAddress || undefined
           },
         ],
         { session },
@@ -208,9 +210,11 @@ const createOrder = asyncHandler(async (req, res) => {
     restaurant: restaurantId,
     restaurantName,
     items: orderItems,
-    totalAmount,
+    totalAmount:finalAmount,
     orderNumber: generateOrderNumber(),
     paymentMethod,
+    customerPhone: customerPhone || undefined,
+    deliveryAddress: deliveryAddress || undefined
   });
 
   await cartModel.findOneAndDelete({ user: req.user.id });
@@ -553,8 +557,15 @@ const applyCoupon = asyncHandler(async (req, res) => {
   );
 });
 
-const removeCoupon = asyncHandler(async(req,res)=>{
+const getPlatformSettingsUser = asyncHandler(async(req,res)=>{
+  const platformSettings = await platformSettingsModel
+    .findOne()
+    .select('-updatedAt -createdAt -__v')
+  if(!platformSettings){
+    throw new ApiError(404,'Platform settings not found')
+  }
 
+  return res.statsu(200).json(new ApiResponse(200,'Platform settings fetched successfully',))
 })
 
 export default {
@@ -565,5 +576,6 @@ export default {
   getVendorOrder,
   changeOrderStatus,
   applyCoupon,
-  getAllCoupons
+  getAllCoupons,
+  getPlatformSettingsUser
 };

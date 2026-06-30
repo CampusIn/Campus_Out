@@ -33,6 +33,16 @@ const cartSnapshotSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    
+    customerPhone: {
+      type: String,
+      trim: true,
+    },
+
+    deliveryAddress: {
+      type: String,
+      trim: true,
+    }
   },
   {
     _id: false,

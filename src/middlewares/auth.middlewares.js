@@ -10,7 +10,8 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "Unauthorized");
   }
 
-  const decoded = await jwt.verify(authHeader, config.JWT_SECRET);
+  try {
+    const decoded = jwt.verify(authHeader, config.JWT_SECRET);
   if (!decoded) {
     throw new ApiError(401, "Unauthorized");
   }
@@ -27,6 +28,12 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
   };
 
   next();
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      throw new ApiError(401, "Token expired");
+    }
+    throw new ApiError(401, "Invalid token");
+  }
 });
 
 export { authMiddleware };
