@@ -12,6 +12,7 @@ import adminRouter from "./routes/admin.routes.js";
 import deliveryRouter from "./routes/deliveryPartner.routes.js";
 import homePageRouter from "./routes/homepageCMS.routes.js";
 import ApiError from "./utils/apiErrors.js";
+import passport from './config/passport.js'
 import cors from "cors";
 
 const app = express();
@@ -19,6 +20,7 @@ const app = express();
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(cookieParser());
+app.use(passport.initialize());
 app.use(
   cors({
     origin: "http://localhost:5173",

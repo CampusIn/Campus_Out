@@ -3,6 +3,7 @@ import authControllers from "../controllers/auth.controllers.js";
 import validators from "../validators/auth.validators.js";
 import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
+import passport from "../config/passport.js";
 const authRouter = Router();
 
 authRouter.post(
@@ -22,5 +23,23 @@ authRouter.post(
   "/verify-email",
   validators.verifyEmailValidationRules,
   authControllers.verifyEmail,
+);
+authRouter.get(
+    "/google",
+    passport.authenticate("google", {
+        scope: ["profile", "email"],
+        session: false,
+    })
+);
+
+authRouter.get(
+    "/google/callback",
+
+    passport.authenticate("google", {
+        session: false,
+        failureRedirect: "/api/auth/google/failure",
+    }),
+
+    authControllers.googleLogin
 );
 export default authRouter;
