@@ -32,6 +32,20 @@ app.use(
   }),
 );
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Campus Out API is running",
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: "ok",
+  });
+});
+
 app.use("/api/auth", authRouter);
 app.use("/api", restaurantRoute);
 app.use("/api/restaurants", menuRouter);
@@ -42,6 +56,16 @@ app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/vendor", vendorRoute);
 app.use("/api/user/homepage", homePageRouter);
+
+app.use((req, res) => {
+  return res.status(404).json({
+    statusCode: 404,
+    data: null,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    success: false,
+    errors: [],
+  });
+});
 
 app.use((err, req, res, next) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;
