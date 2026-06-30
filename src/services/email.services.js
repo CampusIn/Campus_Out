@@ -1,51 +1,87 @@
-import nodemailer from "nodemailer";
 import config from "../config/config.js";
 
-const smtpPort = Number(process.env.SMTP_PORT || 587);
+const createMimeMessage = ({ to, subject, text, html }) => {
+  const boundary = `campus-out-${Date.now()}`;
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: smtpPort,
-  secure: smtpPort === 465,
-  requireTLS: smtpPort === 587,
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-  auth: {
-    type: "OAuth2",
-    user: config.GOOGLE_USER,
-    clientId: config.CLIENT_ID,
-    clientSecret: config.CLIENT_SECRET,
-    refreshToken: config.GOOGLE_REFRESH_TOKEN,
-  },
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.log("Error connecting to email service:", error);
-  } else {
-    console.log("Email service is ready to send messages");
-  }
-});
-
-const sendEmail = async (to, subject, text, html) => {
-  try {
-    const info = await transporter.sendMail({
-      from: `"Campus In" <${config.GOOGLE_USER}>`, // sender address
-      to, // list of recipients
-      subject, // subject line
-      text, // plain text body
-      html, // HTML body
-    });
-
-    console.log("Message sent: %s", info.messageId);
-    // Preview URL is only available when using an Ethereal test account
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-    return info;
-  } catch (err) {
-    console.error("Error while sending mail:", err);
-    throw err;
-  }
+  return [
+    `From: Campus In <${config.GOOGLE_USER}>`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    text,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "",
+    html,
+    "",
+    `--${boundary}--`,
+  ].join("\r\n");
 };
 
-export { transporter, sendEmail };
+const toBase64Url = (value) =>
+  Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+const getGmailAccessToken = async () => {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      client_id: config.CLIENT_ID,
+      client_secret: config.CLIENT_SECRET,
+      refresh_token: config.GOOGLE_REFRESH_TOKEN,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Failed to get Gmail access token:", data);
+    throw new Error(
+      data.error_description || "Failed to get Gmail access token",
+    );
+  }
+
+  return data.access_token;
+};
+
+const sendEmail = async (to, subject, text, html) => {
+  const accessToken = await getGmailAccessToken();
+  const raw = toBase64Url(createMimeMessage({ to, subject, text, html }));
+
+  const response = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Failed to send Gmail message:", data);
+    throw new Error(data.error?.message || "Failed to send email");
+  }
+
+  console.log("Message sent: %s", data.id);
+  return data;
+};
+
+export { sendEmail };

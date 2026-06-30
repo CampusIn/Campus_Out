@@ -62,6 +62,7 @@ const register = asyncHandler(async (req, res) => {
       otpHTML,
     );
   } catch (error) {
+    console.error("Registration OTP email failed:", error.message);
     throw new ApiError(
       500,
       "Registration created, but OTP email could not be sent. Please check email service configuration.",
