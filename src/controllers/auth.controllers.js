@@ -11,6 +11,13 @@ import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 
+const refreshTokenCookieOptions = {
+  httpOnly: true,
+  secure: config.CLIENT_URL?.startsWith("https://"),
+  sameSite: config.CLIENT_URL?.startsWith("https://") ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
 const register = asyncHandler(async (req, res) => {
   const { username, email, password, role } = req.body;
 
@@ -118,10 +125,7 @@ const login = asyncHandler(async (req, res) => {
   );
 
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...refreshTokenCookieOptions,
   });
 
   res
@@ -180,19 +184,14 @@ const refreshToken = asyncHandler(async (req, res) => {
   session.refreshTokenHash = newRefreshTokenHash;
   await session.save();
   res.cookie("refreshToken", newRefeshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...refreshTokenCookieOptions,
   });
 
-  res
-    .status(201)
-    .json(
-      new ApiResponse(201, "New access token created", {
-        accessToken: newAccessToken,
-      }),
-    );
+  res.status(201).json(
+    new ApiResponse(201, "New access token created", {
+      accessToken: newAccessToken,
+    }),
+  );
 });
 
 const logout = asyncHandler(async (req, res) => {
@@ -295,10 +294,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   );
 
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...refreshTokenCookieOptions,
   });
   return res.status(200).json(
     new ApiResponse(200, "Email verified successfully", {
@@ -313,10 +309,9 @@ const verifyEmail = asyncHandler(async (req, res) => {
 });
 
 const googleLogin = asyncHandler(async (req, res) => {
+  const user = req.user;
 
-    const user = req.user;
-
-    const refreshToken = jwt.sign(
+  const refreshToken = jwt.sign(
     {
       id: user._id,
       role: user.role,
@@ -352,15 +347,9 @@ const googleLogin = asyncHandler(async (req, res) => {
   );
 
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...refreshTokenCookieOptions,
   });
-  return res.redirect(
-    `${config.CLIENT_URL}/?token=${accessToken}`
-  );
-
+  return res.redirect(`${config.CLIENT_URL}/?token=${accessToken}`);
 });
 
 export default {
@@ -370,5 +359,5 @@ export default {
   logoutAll,
   login,
   verifyEmail,
-  googleLogin
+  googleLogin,
 };

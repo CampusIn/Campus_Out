@@ -66,6 +66,11 @@ GOOGLE_USER=your_gmail_address
 CLOUDINARY_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+GOOGLE_CLIENT_ID=your_google_login_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_login_oauth_client_secret
+GOOGLE_CALLBACK_URL=https://campus-out.onrender.com/api/auth/google/callback
+CLIENT_URL=https://campus-out-frontend.vercel.app
 ```
 
 ## Setup
@@ -84,7 +89,7 @@ CLOUDINARY_API_SECRET=your_cloudinary_api_secret
    npm run dev
    ```
 
-The Express app enables JSON request bodies, request logging, cookies, and CORS for `http://localhost:5173` with credentials enabled.
+The Express app enables JSON request bodies, request logging, cookies, and CORS for `http://localhost:5173` plus `CLIENT_URL` with credentials enabled.
 
 ## Authentication
 
@@ -111,7 +116,7 @@ Use the access token on protected routes:
 Authorization: Bearer <accessToken>
 ```
 
-Refresh tokens are stored in an `httpOnly` cookie named `refreshToken`. Current cookie settings are `secure: false` and `sameSite: lax` for local development.
+Refresh tokens are stored in an `httpOnly` cookie named `refreshToken`. For HTTPS frontend deployments, the cookie is sent as `secure` with `sameSite: none`; for local development it uses `sameSite: lax`.
 
 Middleware behavior:
 

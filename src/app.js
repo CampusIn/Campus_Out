@@ -12,10 +12,14 @@ import adminRouter from "./routes/admin.routes.js";
 import deliveryRouter from "./routes/deliveryPartner.routes.js";
 import homePageRouter from "./routes/homepageCMS.routes.js";
 import ApiError from "./utils/apiErrors.js";
-import passport from './config/passport.js'
+import passport from "./config/passport.js";
 import cors from "cors";
+import config from "./config/config.js";
 
 const app = express();
+const allowedOrigins = ["http://localhost:5173", config.CLIENT_URL].filter(
+  Boolean,
+);
 
 app.use(express.json());
 app.use(morgan("dev"));
@@ -23,9 +27,7 @@ app.use(cookieParser());
 app.use(passport.initialize());
 app.use(
   cors({
-    origin: ["http://localhost:5173",
-      "https://campus-out-frontend.vercel.app"
-    ],
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -39,7 +41,7 @@ app.use("/api/user", reviewRoute);
 app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/vendor", vendorRoute);
-app.use('/api/user/homepage',homePageRouter)
+app.use("/api/user/homepage", homePageRouter);
 
 app.use((err, req, res, next) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;
