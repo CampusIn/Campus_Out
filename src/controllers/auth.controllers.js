@@ -17,6 +17,11 @@ const refreshTokenCookieOptions = {
   sameSite: config.CLIENT_URL?.startsWith("https://") ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+const clearRefreshTokenCookieOptions = {
+  httpOnly: refreshTokenCookieOptions.httpOnly,
+  secure: refreshTokenCookieOptions.secure,
+  sameSite: refreshTokenCookieOptions.sameSite,
+};
 
 const register = asyncHandler(async (req, res) => {
   const { username, email, password, role } = req.body;
@@ -197,7 +202,8 @@ const refreshToken = asyncHandler(async (req, res) => {
 const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.cookies;
   if (!refreshToken) {
-    throw new ApiError(400, "No refresh token");
+    res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
+    return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
   }
 
   const refreshTokenHash = await crypto
@@ -213,7 +219,7 @@ const logout = asyncHandler(async (req, res) => {
   }
   session.revoked = true;
   await session.save();
-  res.clearCookie("refreshToken");
+  res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
 
   res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
 });
@@ -221,7 +227,10 @@ const logout = asyncHandler(async (req, res) => {
 const logoutAll = asyncHandler(async (req, res) => {
   const { refreshToken } = req.cookies;
   if (!refreshToken) {
-    throw new ApiError(400, "No refresh token found");
+    res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Logged out from all devices"));
   }
   const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
   await sessionModel.updateMany(
@@ -234,7 +243,7 @@ const logoutAll = asyncHandler(async (req, res) => {
     },
   );
 
-  res.clearCookie("refreshToken");
+  res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
   res.status(200).json(new ApiResponse(200, {}, "Logged out from all devices"));
 });
 
