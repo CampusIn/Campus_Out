@@ -12,7 +12,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "npx nodemon server.js"
+    "dev": "npx nodemon server.js",
+    "start": "node server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
