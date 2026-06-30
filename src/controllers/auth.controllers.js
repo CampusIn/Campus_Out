@@ -54,12 +54,19 @@ const register = asyncHandler(async (req, res) => {
     otpHash,
   });
 
-  await sendEmail(
-    email,
-    "Welcome to Campus In",
-    "Thank you for registering with us!",
-    otpHTML,
-  );
+  try {
+    await sendEmail(
+      email,
+      "Welcome to Campus In",
+      "Thank you for registering with us!",
+      otpHTML,
+    );
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Registration created, but OTP email could not be sent. Please check email service configuration.",
+    );
+  }
 
   res.status(201).json(
     new ApiResponse(

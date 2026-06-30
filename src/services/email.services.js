@@ -1,8 +1,16 @@
 import nodemailer from "nodemailer";
 import config from "../config/config.js";
 
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: smtpPort,
+  secure: smtpPort === 465,
+  requireTLS: smtpPort === 587,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
   auth: {
     type: "OAuth2",
     user: config.GOOGLE_USER,
@@ -33,8 +41,10 @@ const sendEmail = async (to, subject, text, html) => {
     console.log("Message sent: %s", info.messageId);
     // Preview URL is only available when using an Ethereal test account
     console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    return info;
   } catch (err) {
     console.error("Error while sending mail:", err);
+    throw err;
   }
 };
 
