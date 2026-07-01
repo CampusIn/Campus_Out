@@ -24,22 +24,24 @@ authRouter.post(
   validators.verifyEmailValidationRules,
   authControllers.verifyEmail,
 );
+authRouter.get("/me", authMiddleware, authControllers.getMe);
+
 authRouter.get(
-    "/google",
-    passport.authenticate("google", {
-        scope: ["profile", "email"],
-        session: false,
-    })
+  "/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+  }),
 );
 
 authRouter.get(
-    "/google/callback",
+  "/google/callback",
 
-    passport.authenticate("google", {
-        session: false,
-        failureRedirect: "/api/auth/google/failure",
-    }),
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: "/api/auth/google/failure",
+  }),
 
-    authControllers.googleLogin
+  authControllers.googleLogin,
 );
 export default authRouter;
