@@ -366,7 +366,8 @@ const googleLogin = asyncHandler(async (req, res) => {
   res.cookie("refreshToken", refreshToken, {
     ...refreshTokenCookieOptions,
   });
-  return res.redirect(`${config.CLIENT_URL}/auth/success`);
+  return res.redirect(`${config.CLIENT_URL}/auth/success?token=${accessToken}`);
+
 });
 
 export default {
