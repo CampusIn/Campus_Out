@@ -13,8 +13,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 
 const refreshTokenCookieOptions = {
   httpOnly: true,
-  secure: config.CLIENT_URL?.startsWith("https://"),
-  sameSite: config.CLIENT_URL?.startsWith("https://") ? "none" : "lax",
+  secure: true,
+  sameSite: "none",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 const clearRefreshTokenCookieOptions = {
