@@ -394,4 +394,5 @@ export default {
   login,
   verifyEmail,
   googleLogin,
+  getMe
 };
