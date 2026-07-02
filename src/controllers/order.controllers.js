@@ -565,7 +565,7 @@ const getPlatformSettingsUser = asyncHandler(async(req,res)=>{
     throw new ApiError(404,'Platform settings not found')
   }
 
-  return res.statsu(200).json(new ApiResponse(200,'Platform settings fetched successfully',))
+  return res.status(200).json(new ApiResponse(200,'Platform settings fetched successfully',platformSettings))
 })
 
 export default {

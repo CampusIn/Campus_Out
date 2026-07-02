@@ -45,6 +45,13 @@ orderRouter.patch(
 );
 
 orderRouter.get(
+  '/settings',
+  authMiddleware,
+  roleMiddleware('user'),
+  orderController.getPlatformSettingsUser
+)
+
+orderRouter.get(
     "/coupons/view",
     authMiddleware,
     roleMiddleware("user"),
