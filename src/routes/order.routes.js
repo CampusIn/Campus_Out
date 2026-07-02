@@ -37,6 +37,12 @@ orderRouter.get(
   roleMiddleware("vendor"),
   orderController.getVendorOrder,
 );
+orderRouter.get(
+  "/order/restaurant/:orderId",
+  authMiddleware,
+  roleMiddleware("vendor"),
+  orderController.getSingleVendorOrder,
+);
 orderRouter.patch(
   "/order/:orderId/status",
   authMiddleware,

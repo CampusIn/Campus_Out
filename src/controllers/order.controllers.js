@@ -136,15 +136,14 @@ const createOrder = asyncHandler(async (req, res) => {
             restaurant: restaurantId,
             restaurantName,
             items: orderItems,
-            totalAmount:finalAmount,
+            totalAmount: finalAmount,
             orderNumber: generateOrderNumber(),
             paymentMethod,
             coupon: couponId,
             couponCode: coupon.code,
             discountAmount: couponDiscount,
-            customerPhone: customerPhone || undefined,
-            deliveryAddress: deliveryAddress || undefined
-          },
+            customerPhone: customerPhone,
+            deliveryAddress: deliveryAddress          },
         ],
         { session },
       );
@@ -189,10 +188,11 @@ const createOrder = asyncHandler(async (req, res) => {
     );
   }
 
+
   const platformSettings = await platformSettingsModel.findOne();
-    if (!platformSettings) {
-      throw new ApiError(404, "Platform settings not found");
-    }
+  if (!platformSettings) {
+    throw new ApiError(404, "Platform settings not found");
+  }
 
   const gstPercentage = platformSettings.gstPercentage;
   const gstAmount = Math.round((totalAmount * gstPercentage) / 100);
@@ -210,11 +210,11 @@ const createOrder = asyncHandler(async (req, res) => {
     restaurant: restaurantId,
     restaurantName,
     items: orderItems,
-    totalAmount:finalAmount,
+    totalAmount: finalAmount,
     orderNumber: generateOrderNumber(),
     paymentMethod,
-    customerPhone: customerPhone || undefined,
-    deliveryAddress: deliveryAddress || undefined
+    customerPhone: customerPhone,
+    deliveryAddress: deliveryAddress
   });
 
   await cartModel.findOneAndDelete({ user: req.user.id });
@@ -288,7 +288,7 @@ const getSingleOrder = asyncHandler(async (req, res) => {
   const order = await orderModel
     .findById(orderId)
     .select(
-      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount createdAt",
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt",
     )
     .populate({
       path: "items.menuItem",
@@ -354,6 +354,7 @@ const getVendorOrder = asyncHandler(async (req, res) => {
   const totalPages = Math.ceil(totalOrders / limitNumber);
   const orders = await orderModel
     .find({ restaurant: restaurant._id })
+    .select("user items totalAmount orderNumber paymentMethod paymentStatus orderStatus createdAt customerPhone deliveryAddress discountAmount gstAmount packagingCharge deliveryCharge couponCode")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limitNumber)
@@ -361,6 +362,8 @@ const getVendorOrder = asyncHandler(async (req, res) => {
       path: "user",
       select: "username",
     });
+
+
 
   if (orders.length === 0) {
     return res.status(200).json(
@@ -387,6 +390,36 @@ const getVendorOrder = asyncHandler(async (req, res) => {
       },
     }),
   );
+});
+
+const getSingleVendorOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Inavlid order Id");
+  }
+
+
+  const order = await orderModel
+    .findById(orderId)
+    .select(
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt")
+    .populate([
+      {
+      path: "items.menuItem",
+      select: "image",},
+    {
+      path:'user',
+      select:'username'
+    }]
+    );
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Order details fetched successfuly", order));
 });
 
 const changeOrderStatus = asyncHandler(async (req, res) => {
@@ -557,15 +590,15 @@ const applyCoupon = asyncHandler(async (req, res) => {
   );
 });
 
-const getPlatformSettingsUser = asyncHandler(async(req,res)=>{
+const getPlatformSettingsUser = asyncHandler(async (req, res) => {
   const platformSettings = await platformSettingsModel
     .findOne()
     .select('-updatedAt -createdAt -__v')
-  if(!platformSettings){
-    throw new ApiError(404,'Platform settings not found')
+  if (!platformSettings) {
+    throw new ApiError(404, 'Platform settings not found')
   }
 
-  return res.status(200).json(new ApiResponse(200,'Platform settings fetched successfully',platformSettings))
+  return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
 })
 
 export default {
@@ -574,6 +607,7 @@ export default {
   getSingleOrder,
   cancelOrder,
   getVendorOrder,
+  getSingleVendorOrder,
   changeOrderStatus,
   applyCoupon,
   getAllCoupons,

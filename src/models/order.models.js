@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const cartSnapshotSchema = new mongoose.Schema(
@@ -33,16 +34,6 @@ const cartSnapshotSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    
-    customerPhone: {
-      type: String,
-      trim: true,
-    },
-
-    deliveryAddress: {
-      type: String,
-      trim: true,
-    }
   },
   {
     _id: false,
@@ -98,6 +89,14 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+    },
+    customerPhone: {
+      type: String,
+      trim: true,
+    },
+    deliveryAddress: {
+      type: String,
+      trim: true,
     },
     deliveryPartner: {
       type: mongoose.Schema.Types.ObjectId,
