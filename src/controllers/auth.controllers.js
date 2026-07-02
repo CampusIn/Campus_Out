@@ -100,6 +100,10 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Please verify your email before logging in");
   }
 
+  if (!user.password) {
+    throw new ApiError(400, "Please login with Google");
+  }
+
   const isPasswordMatch = await bcrypt.compare(password, user.password);
   if (!isPasswordMatch) {
     throw new ApiError(400, "Invalid credentials");
