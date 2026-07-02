@@ -62,6 +62,8 @@ const menuItemSchema = new mongoose.Schema(
   },
 );
 
+const menuItemIndex = menuItemSchema.index({ restaurant: 1, name: 1 }, { unique: true });
+
 const menuModel = mongoose.model("Menu", menuItemSchema);
 
 export default menuModel;
