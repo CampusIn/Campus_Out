@@ -23,6 +23,11 @@ menuRouter.post(
 
 menuRouter.get("/:restaurantId/menu", menuController.getRestaurantMenu);
 
+menuRouter.get(
+  "/menu/suggestions",
+  menuController.getMenuSuggestions
+);
+
 menuRouter.get("/menu/:id", menuController.getMenuItemById);
 
 menuRouter.patch(
@@ -54,5 +59,7 @@ menuRouter.delete(
   restaurantSuspensionMiddleware,
   menuController.deleteMenuItem,
 );
+
+
 
 export default menuRouter;

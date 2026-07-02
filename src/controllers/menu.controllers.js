@@ -20,7 +20,7 @@ const createMenuItem = asyncHandler(async (req, res) => {
   if (restaurant.owner.toString() !== req.user.id.toString()) {
     throw new ApiError(403, "Forbidden");
   }
-  const { name, description, price, category, mrp } = req.body;
+  const { name, description, price, category, mrp, foodType } = req.body;
   if (mrp < price) {
     throw new ApiError(400, "MRP cannot be less than price");
   }
@@ -37,6 +37,7 @@ const createMenuItem = asyncHandler(async (req, res) => {
     price,
     category,
     mrp,
+    foodType,
     image: imageUrl,
   });
   return res
@@ -88,7 +89,7 @@ const updateMenuItem = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Bad Request");
   }
   const menuItem = await verifyMenuOwnership(id, req.user.id);
-  const allowedFields = ["name", "description", "price", "category", "image"];
+  const allowedFields = ["name", "description", "price", "category", "image", "foodType"];
 
   const filteredBody = {};
   allowedFields.forEach((field) => {
@@ -134,6 +135,38 @@ const deleteMenuItem = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, "Menu deleted successfuly"));
 });
 
+const getMenuSuggestions = asyncHandler(async (req, res) => {
+  const { q } = req.query;
+  if (!q.trim()) {
+    return res.status(200).json(new ApiResponse(200, "No query provided", []));
+  }
+
+  const suggestions = await menuModel
+    .find({
+      name: { $regex: q, $options: "i" },
+      isDeleted: false,
+      isAvailable: true,
+    })
+    .select("_id name image price category restaurant")
+    .limit(5);
+
+  if (suggestions.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "No suggestions found", []));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Menu suggestions fetched successfully",
+        suggestions,
+      ),
+    );
+});
+
 export default {
   createMenuItem,
   getRestaurantMenu,
@@ -141,4 +174,5 @@ export default {
   updateMenuItem,
   updateMenuStatus,
   deleteMenuItem,
+  getMenuSuggestions,
 };

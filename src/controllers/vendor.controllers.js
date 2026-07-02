@@ -254,11 +254,12 @@ const bulkUpload = asyncHandler(async (req, res) => {
       !item.name ||
       !item.description ||
       item.mrp === undefined ||
-      item.price === undefined
+      item.price === undefined ||
+      !item.foodType
     ) {
       throw new ApiError(
         400,
-        "Each item must contain name, description, mrp and price",
+        "Each item must contain name, description, mrp, price",
       );
     }
 
@@ -278,6 +279,7 @@ const bulkUpload = asyncHandler(async (req, res) => {
     mrp: item.mrp,
     price: item.price,
     category: item.category || "Uncategorized",
+    foodType: item.foodType,
     image: imageUrls[index],
   }));
 

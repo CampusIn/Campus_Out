@@ -25,7 +25,7 @@ authRouter.post(
   authControllers.verifyEmail,
 );
 authRouter.get("/me", authMiddleware, authControllers.getMe);
-
+authRouter.patch("/me", authMiddleware, authControllers.updateProfile);
 authRouter.get(
   "/google",
   passport.authenticate("google", {

@@ -30,6 +30,12 @@ const menuItemSchema = new mongoose.Schema(
       type: String,
       required: [true, "Category is required"],
     },
+      foodType:{
+        type:String,
+        enum:["veg","non-veg"],
+        required:[true,"Food type is required"]
+      }
+    ,
     isAvailable: {
       type: Boolean,
       default: true,

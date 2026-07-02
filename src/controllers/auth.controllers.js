@@ -10,6 +10,7 @@ import otpModel from "../models/otp.models.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import mongoose from "mongoose";
 
 const refreshTokenCookieOptions = {
   httpOnly: true,
@@ -386,6 +387,42 @@ const getMe = asyncHandler(async (req, res) => {
   );
 });
 
+const updateProfile = asyncHandler(async(req,res)=>{
+  const userId = req.user.id
+  if(!mongoose.Types.ObjectId.isValid(userId)){
+    throw new ApiError(400, "Invalid user ID")
+  }
+  const{username} = req.body
+  const updateData = {}
+  if(username){
+    const existingUser = await userModel.findOne({
+      username,
+      _id:{ $ne: userId }
+    })
+    if(existingUser){
+      throw new ApiError(400, "Username already exists")
+    }
+
+    updateData.username = username
+  }
+const updatedUser = await userModel.findByIdAndUpdate(
+  userId,
+  updateData,
+  { new: true }
+)
+if(!updatedUser){
+  throw new ApiError(404, "User not found")
+}
+res.status(200).json(
+  new ApiResponse(200, "Profile updated successfully", {
+    id: updatedUser._id,
+    username: updatedUser.username,
+    email: updatedUser.email,
+    role: updatedUser.role
+  })
+)
+})
+
 export default {
   register,
   refreshToken,
@@ -394,5 +431,6 @@ export default {
   login,
   verifyEmail,
   googleLogin,
-  getMe
+  getMe,
+  updateProfile
 };
