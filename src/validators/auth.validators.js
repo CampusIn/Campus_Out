@@ -72,8 +72,20 @@ const verifyEmailValidationRules = [
   validateResult,
 ];
 
+const resendOtpValidationRules = [
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+  validateResult,
+];
+
 export default {
   registerValidationRules,
   loginValidationRules,
   verifyEmailValidationRules,
+  resendOtpValidationRules,
 };

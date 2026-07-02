@@ -63,7 +63,8 @@ const register = asyncHandler(async (req, res) => {
       otpHTML,
     );
   } catch (error) {
-    console.error("Registration OTP email failed:", error.message);
+    await otpModel.deleteMany({ email });
+
     throw new ApiError(
       500,
       "Registration created, but OTP email could not be sent. Please check email service configuration.",
@@ -326,6 +327,61 @@ const verifyEmail = asyncHandler(async (req, res) => {
   );
 });
 
+const resendOTP = asyncHandler(async(req,res)=>{
+  const {email} = req.body
+  if(!email){
+    throw new ApiError(400,"Email is required")
+  }
+
+  const user = await userModel.findOne({
+    email,
+  })
+
+  if(!user){
+    return res.status(200).json(new ApiResponse(200, "If the email is registered, an OTP will be sent", {}))
+  }
+
+  if(user.verified){
+    throw new ApiError(400, "Email is already verified")
+  }
+
+  const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
+  const recentOtp = await otpModel.findOne({
+    email,
+    createdAt: { $gte: sixtySecondsAgo },
+  });
+
+  if (recentOtp) {
+    throw new ApiError(429, "Please wait before requesting a new OTP");
+  }
+
+  const otp = generateOTP()
+  const otpHTML = generateOtpHTML(otp)
+  await otpModel.deleteMany({email})
+  const otpHash = await bcrypt.hash(otp,10)
+  await otpModel.create({
+    email,
+    user: user._id,
+    otpHash
+  })
+
+  try{
+    await sendEmail(
+      email,
+      "Hey, didn't you verify your email yet? Here's your OTP",
+      "Please use the following OTP to verify your email:",
+      otpHTML
+    )
+  }
+  catch(error){
+    await otpModel.deleteMany({email})
+    throw new ApiError(500, "Failed to send OTP")
+  }
+
+  return res.status(200).json(new ApiResponse(200, "OTP resent successfully"));
+
+});
+
 const googleLogin = asyncHandler(async (req, res) => {
   const user = req.user;
 
@@ -421,7 +477,7 @@ res.status(200).json(
     role: updatedUser.role
   })
 )
-})
+});
 
 export default {
   register,
@@ -432,5 +488,6 @@ export default {
   verifyEmail,
   googleLogin,
   getMe,
-  updateProfile
+  updateProfile,
+  resendOTP
 };

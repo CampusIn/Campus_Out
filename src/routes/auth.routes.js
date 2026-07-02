@@ -19,6 +19,12 @@ authRouter.post(
   validators.loginValidationRules,
   authControllers.login,
 );
+
+authRouter.post(
+  "/resend-otp",
+  validators.resendOtpValidationRules,
+  authControllers.resendOTP
+);
 authRouter.post(
   "/verify-email",
   validators.verifyEmailValidationRules,
