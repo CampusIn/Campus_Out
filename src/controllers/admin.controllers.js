@@ -12,6 +12,8 @@ import announcementModel from "../models/anouncement.models.js";
 import bannerModel from "../models/banners.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
+import generateInvoicePDF from "../services/invoice.services.js";
+
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -956,6 +958,37 @@ const topRestaurants = asyncHandler(async (req, res) => {
     );
 });
 
+const generateInvoice = asyncHandler(async (req, res) => {
+  const {orderId} = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  const order = await orderModel
+    .findById(orderId)
+    .populate([
+      {
+        path: "user",
+        select: "username email",
+      },
+      {
+        path: "restaurant",
+        select: "restaurantName location phone",
+      },
+    ]);
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  const pdfBuffer = await generateInvoicePDF(order);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=invoice-${order.orderNumber}.pdf`,
+  );
+  res.send(pdfBuffer);
+});
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -985,5 +1018,6 @@ export default {
   updateBanner,
   updateBannerStatus,
   topRestaurants,
-  getPlatformSettingsAdmin
+  getPlatformSettingsAdmin,
+  generateInvoice
 };

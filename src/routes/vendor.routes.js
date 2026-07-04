@@ -5,44 +5,44 @@ import vendorControllers from "../controllers/vendor.controllers.js";
 import { blockMiddleware } from "../middlewares/block.middlewares.js";
 import upload from "../middlewares/multer.middlewares.js";
 
-const vendorRoute = Router();
+const vendorRouter = Router();
 
-vendorRoute.get(
+vendorRouter.get(
   "/dashboard/overview",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.getVendorOverview,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/dashboard/top-items",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.getTopItems,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/dashboard/order-status-breakdown",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.orderStatusBreakdown,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/dashboard/daily-revenue",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.revenueStatsPerWeek,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/dashboard/average-order-value",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.averageOrderValue,
 );
 
-vendorRoute.patch(
+vendorRouter.patch(
   "/menu/:menuId/stock",
   authMiddleware,
   roleMiddleware("vendor"),
@@ -50,21 +50,21 @@ vendorRoute.patch(
   vendorControllers.updateStock,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/inventory",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.getAllMenu,
 );
 
-vendorRoute.get(
+vendorRouter.get(
   "/inventory/low-stock",
   authMiddleware,
   roleMiddleware("vendor"),
   vendorControllers.lowStockItems,
 );
 
-vendorRoute.post(
+vendorRouter.post(
   "/menu/bulk-upload",
   authMiddleware,
   roleMiddleware("vendor"),
@@ -73,4 +73,10 @@ vendorRoute.post(
   vendorControllers.bulkUpload,
 );
 
-export default vendorRoute;
+vendorRouter.get(
+  "/orders/:orderId/invoice",
+  authMiddleware,
+  roleMiddleware('vendor'),
+  vendorControllers.generateInvoice
+)
+export default vendorRouter;

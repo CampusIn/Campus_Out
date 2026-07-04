@@ -223,4 +223,10 @@ adminRouter.get(
   adminController.topRestaurants,
 );
 
+adminRouter.get(
+  "/orders/:orderId/invoice",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.generateInvoice
+);
 export default adminRouter;

@@ -11,6 +11,7 @@ import averageOrderPipeline from "../utils/averageOrder.utils.js";
 import mongoose from "mongoose";
 import menuModel from "../models/menuItem.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
+import generateInvoicePDF from "../services/invoice.services.js";
 
 const getVendorOverview = asyncHandler(async (req, res) => {
   const vendorId = req.user.id;
@@ -295,6 +296,35 @@ const bulkUpload = asyncHandler(async (req, res) => {
   );
 });
 
+const generateInvoice = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid order ID");
+  }
+
+  const order = await orderModel
+    .findById(orderId)
+    .populate("restaurant");
+
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  if(order.restaurant.owner.toString() !== req.user.id) {
+    throw new ApiError(403, "You are not authorized to generate invoice for this order");
+  }
+
+  const invoiceBuffer = await generateInvoicePDF(order);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=invoice_${orderId}.pdf`,
+  );
+  res.send(invoiceBuffer);
+})
+
 export default {
   getVendorOverview,
   getTopItems,
@@ -305,4 +335,5 @@ export default {
   getAllMenu,
   lowStockItems,
   bulkUpload,
+  generateInvoice
 };
