@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema({
     enum:['google','local'],
     default:'local'
   }
+},{
+  timestamps:true
 });
 
 const userModel = mongoose.model("User", userSchema);

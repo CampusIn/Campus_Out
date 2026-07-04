@@ -10,9 +10,13 @@ import couponModel from "../models/coupon.models.js";
 import mongoose from "mongoose";
 import announcementModel from "../models/anouncement.models.js";
 import bannerModel from "../models/banners.models.js";
+import cartModel from "../models/cart.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 import generateInvoicePDF from "../services/invoice.services.js";
+import { sendEmail } from "../services/email.services.js";
+import reminderHTML from "../utils/reminderHTML.utils.js";
+import config from "../config/config.js";
 
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
@@ -989,6 +993,115 @@ const generateInvoice = asyncHandler(async (req, res) => {
   res.send(pdfBuffer);
 });
 
+const abandonCart = asyncHandler(async(req,res)=>{
+  const { page = 1, limit = 5} = req.query
+  const pageNumber = parseInt(page) || 1
+  const limitNumber = parseInt(limit) || 5
+  const skip = (pageNumber - 1) * limitNumber
+  let filter = {}
+
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate()- 1)
+  filter.updatedAt = {
+    $lte:yesterday
+  }
+
+  filter.$expr = {
+    $gt:[{$size:'$items'},0]
+  }
+  
+
+
+  const [carts, totalCarts] = await Promise.all([
+    cartModel
+    .find(filter)
+    .populate({
+      path:'user',
+      select:'username email'
+    })
+    .sort({updatedAt:1})
+    .select('items totalAmount updatedAt')
+    .skip(skip)
+    .limit(limitNumber),
+
+    cartModel.countDocuments(filter)
+  ])
+
+  const totalPages = Math.ceil(totalCarts/limitNumber)
+
+  if(carts.length === 0){
+    res.status(200).json(new ApiResponse(200,'No Abandoned carts to fetch',{
+    carts,
+    pagination:{
+      'page':pageNumber,
+      'limit':limitNumber,
+      totalCarts,
+      totalPages
+    }
+  }))
+  }
+
+
+  res.status(200).json(new ApiResponse(200,'Abandoned carts fetched successfully',{
+    carts,
+    pagination:{
+      'page':pageNumber,
+      'limit':limitNumber,
+      totalCarts,
+      totalPages
+    }
+  }))
+});
+
+const sendReminder = asyncHandler(async(req,res) =>{
+  const {userId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(userId)){
+    throw new ApiError(400,'User ID is invalid')
+  }
+
+  const user = await userModel.findById(userId)
+  if(!user){
+    throw new ApiError(404,'User does not exists')
+  }
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate()- 1)
+  const cart = await cartModel.findOne({
+    user:userId,
+    $expr:{$gt:[{$size:'$items'},0]},
+    updatedAt:{$lte:yesterday}
+  
+  })
+  if(!cart){
+    throw new ApiError(404,'Cart does not exists')
+  }
+
+  if(!user.email){
+    throw new ApiError(400,'User does not have a valid email ID')
+  }
+
+  try {
+    await sendEmail(
+      user.email,
+      'Hey Cutie you left something delicious behind!',
+      `Hi Joel,
+
+You left some delicious items in your CAMPUSIN cart.
+
+Complete your order here:
+
+${config.CLIENT_ID}/cart
+
+Team CAMPUSIN`,
+      reminderHTML()
+
+    )
+  } catch (error) {
+    throw new ApiError(400,'Error in sending email')
+  }
+
+  return res.status(200).json(new ApiResponse(200,'Email has been sent successfully'))
+});
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -1019,5 +1132,7 @@ export default {
   updateBannerStatus,
   topRestaurants,
   getPlatformSettingsAdmin,
-  generateInvoice
+  generateInvoice,
+  abandonCart,
+  sendReminder
 };

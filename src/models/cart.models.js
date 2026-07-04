@@ -41,7 +41,7 @@ const cartSchema = new mongoose.Schema(
   },
 );
 
-const cartIndex = cartSchema.index({ user: 1, restaurant: 1 }, { unique: true });
+
 
 const cartModel = mongoose.model("Cart", cartSchema);
 

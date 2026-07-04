@@ -229,4 +229,18 @@ adminRouter.get(
   roleMiddleware("admin"),
   adminController.generateInvoice
 );
+
+adminRouter.get(
+  "/abandoned-carts",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.abandonCart
+)
+
+adminRouter.post(
+  "/abandoned-carts/:userId/remind",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.sendReminder
+)
 export default adminRouter;
