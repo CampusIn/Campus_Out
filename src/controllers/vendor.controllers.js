@@ -305,7 +305,16 @@ const generateInvoice = asyncHandler(async (req, res) => {
 
   const order = await orderModel
     .findById(orderId)
-    .populate("restaurant");
+    .populate([
+      {
+        path: "user",
+        select: "username email",
+      },
+      {
+        path: "restaurant",
+        select: "restaurantName location phone owner",
+      },
+    ]);
 
   if (!order) {
     throw new ApiError(404, "Order not found");
