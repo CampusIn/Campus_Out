@@ -1002,13 +1002,13 @@ const abandonCart = asyncHandler(async(req,res)=>{
 
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate()- 1)
-  filter.updatedAt = {
+   filter.updatedAt = {
     $lte:yesterday
   }
 
   filter.$expr = {
     $gt:[{$size:'$items'},0]
-  }
+}
   
 
 
@@ -1030,7 +1030,7 @@ const abandonCart = asyncHandler(async(req,res)=>{
   const totalPages = Math.ceil(totalCarts/limitNumber)
 
   if(carts.length === 0){
-    res.status(200).json(new ApiResponse(200,'No Abandoned carts to fetch',{
+    return res.status(200).json(new ApiResponse(200,'No Abandoned carts to fetch',{
     carts,
     pagination:{
       'page':pageNumber,
@@ -1042,7 +1042,7 @@ const abandonCart = asyncHandler(async(req,res)=>{
   }
 
 
-  res.status(200).json(new ApiResponse(200,'Abandoned carts fetched successfully',{
+  return res.status(200).json(new ApiResponse(200,'Abandoned carts fetched successfully',{
     carts,
     pagination:{
       'page':pageNumber,
