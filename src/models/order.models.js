@@ -82,8 +82,13 @@ const orderSchema = new mongoose.Schema(
         "OUT_FOR_DELIVERY",
         "DELIVERED",
         "CANCELLED",
+        "REJECTED"
       ],
       default: "PENDING",
+    },
+    rejectionMsg:{
+      type:String,
+      default:null
     },
     orderNumber: {
       type: String,

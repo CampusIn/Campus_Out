@@ -315,8 +315,6 @@ const cancelOrder = asyncHandler(async (req, res) => {
   if (!order) {
     throw new ApiError(404, "Order does not exist");
   }
-  console.log(order.user.toString());
-  console.log(req.user.id);
   if (order.user.toString() !== req.user.id) {
     throw new ApiError(403, " Forbidden");
   }
@@ -439,7 +437,7 @@ const changeOrderStatus = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     throw new ApiError(400, "Inavlid Order Id");
   }
-  const allowedStatus = ["CONFIRMED", "PREPARING", "READY", "DELIVERED"];
+  const allowedStatus = ["CONFIRMED", "PREPARING", "READY", "DELIVERED", "REJECTED"];
 
   const isValidStatus = allowedStatus.includes(orderStatus);
   if (!isValidStatus) {
@@ -459,6 +457,14 @@ const changeOrderStatus = asyncHandler(async (req, res) => {
 
   if (order.orderStatus === "DELIVERED") {
     throw new ApiError(409, "Order is delivered,no more changes can be made");
+  }
+
+  if(order.orderStatus === "REJECTED"){
+    const { rejectionMsg } = req.body;
+    if (!rejectionMsg || rejectionMsg.trim() === "") {
+      throw new ApiError(400, "Rejection message is required");
+    }
+    order.rejectionMsg = rejectionMsg;
   }
   order.orderStatus = orderStatus;
   await order.save();
