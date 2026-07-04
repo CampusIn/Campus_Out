@@ -165,8 +165,9 @@ const getAllMenu = asyncHandler(async (req, res) => {
   const menuItems = await menuModel
     .find({
       restaurant: restaurant._id,
+      isDeleted: false,
     })
-    .select("name stockQty lowStockThreshold isAvailable");
+    .select("name stockQty lowStockThreshold isAvailable isDeleted");
 
   if (menuItems.length === 0) {
     return res
@@ -191,6 +192,7 @@ const lowStockItems = asyncHandler(async (req, res) => {
   const lowStockMenu = await menuModel
     .find({
       restaurant: restaurant._id,
+      isDeleted: false,
       $expr: {
         $lte: ["$stockQty", "$lowStockThreshold"],
       },

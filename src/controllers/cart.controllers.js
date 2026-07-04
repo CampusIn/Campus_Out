@@ -22,6 +22,12 @@ const addToCart = asyncHandler(async (req, res) => {
   if (!menu.isAvailable) {
     throw new ApiError(400, "Item currently unavailable");
   }
+  if (quantity > menu.stockQty) {
+    throw new ApiError(
+      400,
+      `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+    );
+  }
 
   let cart = await cartModel.findOne({
     user: req.user.id,
@@ -46,6 +52,12 @@ const addToCart = asyncHandler(async (req, res) => {
   });
 
   if (existingItem) {
+    if (existingItem.quantity + quantity > menu.stockQty) {
+      throw new ApiError(
+        400,
+        `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+      );
+    }
     existingItem.quantity += quantity;
   } else {
     cart.items.push({
@@ -110,6 +122,15 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
         400,
         "One or more items in your cart is not available",
       );
+    if (!menu.isAvailable) {
+      throw new ApiError(400, `${menu.name} is currently unavailable`);
+    }
+    if (item.quantity > menu.stockQty) {
+      throw new ApiError(
+        400,
+        `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+      );
+    }
     const finalPrice = item.quantity * menu.price;
     return sum + finalPrice;
   }, 0);
@@ -151,6 +172,17 @@ const updateCartItemQuantity = asyncHandler(async (req, res) => {
 
   if (!item) {
     throw new ApiError(404, "No such item in the cart");
+  }
+
+  const menu = await menuModel.findById(menuItemId);
+  if (!menu || !menu.isAvailable) {
+    throw new ApiError(400, "Item currently unavailable");
+  }
+  if (quantity > menu.stockQty) {
+    throw new ApiError(
+      400,
+      `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+    );
   }
 
   item.quantity = quantity;

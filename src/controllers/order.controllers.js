@@ -10,6 +10,77 @@ import mongoose from "mongoose";
 import couponModel from "../models/coupon.models.js";
 import platformSettingsModel from "../models/platformSettings.models.js";
 import couponUsageModel from "../models/couponUsage.models.js";
+import menuModel from "../models/menuItem.models.js";
+
+const validateCartItems = (cartItems) => {
+  cartItems.forEach((item) => {
+    if (!item.menuItem) {
+      throw new ApiError(400, "One or more items no longer exists");
+    }
+    if (!item.menuItem.isAvailable) {
+      throw new ApiError(400, "One or more items are not available");
+    }
+    if (item.quantity > item.menuItem.stockQty) {
+      throw new ApiError(
+        400,
+        `Item ${item.menuItem.name} is out of stock. Available quantity: ${item.menuItem.stockQty}`,
+      );
+    }
+  });
+};
+
+const reserveOrderStock = async (orderItems, session) => {
+  for (const item of orderItems) {
+    const updatedMenu = await menuModel.findOneAndUpdate(
+      {
+        _id: item.menuItem,
+        isDeleted: false,
+        isAvailable: true,
+        stockQty: { $gte: item.quantity },
+      },
+      {
+        $inc: {
+          stockQty: -item.quantity,
+        },
+      },
+      {
+        new: true,
+        session,
+      },
+    );
+
+    if (!updatedMenu) {
+      throw new ApiError(
+        409,
+        `Insufficient stock for ${item.itemName}. Please update your cart and try again.`,
+      );
+    }
+
+    if (updatedMenu.stockQty === 0) {
+      updatedMenu.isAvailable = false;
+      await updatedMenu.save({ session });
+    }
+  }
+};
+
+const restoreOrderStock = async (orderItems, session) => {
+  for (const item of orderItems) {
+    await menuModel.updateOne(
+      {
+        _id: item.menuItem,
+      },
+      {
+        $inc: {
+          stockQty: item.quantity,
+        },
+        $set: {
+          isAvailable: true,
+        },
+      },
+      { session },
+    );
+  }
+};
 
 //User order section Start
 const createOrder = asyncHandler(async (req, res) => {
@@ -30,14 +101,7 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cart is empty");
   }
 
-  cart.items.forEach((item) => {
-    if (!item.menuItem) {
-      throw new ApiError(400, "One or more items no longer exists");
-    }
-    if (!item.menuItem.isAvailable) {
-      throw new ApiError(400, "One or more items are not available");
-    }
-  });
+  validateCartItems(cart.items);
 
   const restaurantId = cart.restaurant;
   const restaurant = await restaurantModel.findById(restaurantId);
@@ -58,13 +122,19 @@ const createOrder = asyncHandler(async (req, res) => {
     return total + itemPrice;
   }, 0);
 
+  let coupon = null;
+  let couponDiscount = 0;
+  let applied = false;
+  let couponCode = null;
+  let pricingBase = totalAmount;
+
   //If coupon is valid, then coupon discount is calculated
   if (couponId) {
     if (!mongoose.Types.ObjectId.isValid(couponId)) {
       throw new ApiError(400, "Invalid Coupon ID");
     }
     const todayDate = new Date();
-    const coupon = await couponModel.findOne({
+    coupon = await couponModel.findOne({
       _id: couponId,
       isActive: true,
       expiryDate: { $gte: todayDate },
@@ -104,50 +174,57 @@ const createOrder = asyncHandler(async (req, res) => {
     } else if (coupon.discountType === "FIXED") {
       discount = coupon.discountValue;
     }
+    couponDiscount = Math.min(discount, totalAmount);
+    pricingBase = totalAmount - couponDiscount;
+    applied = true;
+    couponCode = coupon.code;
+  }
 
-    const platformSettings = await platformSettingsModel.findOne();
-    if (!platformSettings) {
-      throw new ApiError(404, "Platform settings not found");
-    }
+  const platformSettings = await platformSettingsModel.findOne();
+  if (!platformSettings) {
+    throw new ApiError(404, "Platform settings not found");
+  }
 
-    const couponDiscount = Math.min(discount, totalAmount);
-    const subTotalAfterDiscount = totalAmount - couponDiscount;
-    const gstPercentage = platformSettings.gstPercentage;
-    const gstAmount = Math.round((subTotalAfterDiscount * gstPercentage) / 100);
-    let deliveryCharge = platformSettings.deliveryCharge;
-    const packagingCharge = platformSettings.packagingCharge;
-    const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
+  const gstPercentage = platformSettings.gstPercentage;
+  const gstAmount = Math.round((pricingBase * gstPercentage) / 100);
+  let deliveryCharge = platformSettings.deliveryCharge;
+  const packagingCharge = platformSettings.packagingCharge;
+  const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
 
-    if (freeDeliveryAbove <= subTotalAfterDiscount) deliveryCharge = 0;
+  if (freeDeliveryAbove <= pricingBase) deliveryCharge = 0;
 
-    const finalAmount =
-      subTotalAfterDiscount + gstAmount + deliveryCharge + packagingCharge;
+  const finalAmount =
+    pricingBase + gstAmount + deliveryCharge + packagingCharge;
 
-    const session = await mongoose.startSession();
-    let order;
+  const session = await mongoose.startSession();
+  let order;
 
-    try {
-      session.startTransaction();
+  try {
+    session.startTransaction();
 
-      [order] = await orderModel.create(
-        [
-          {
-            user: req.user.id,
-            restaurant: restaurantId,
-            restaurantName,
-            items: orderItems,
-            totalAmount: finalAmount,
-            orderNumber: generateOrderNumber(),
-            paymentMethod,
-            coupon: couponId,
-            couponCode: coupon.code,
-            discountAmount: couponDiscount,
-            customerPhone: customerPhone,
-            deliveryAddress: deliveryAddress          },
-        ],
-        { session },
-      );
+    await reserveOrderStock(orderItems, session);
 
+    [order] = await orderModel.create(
+      [
+        {
+          user: req.user.id,
+          restaurant: restaurantId,
+          restaurantName,
+          items: orderItems,
+          totalAmount: finalAmount,
+          orderNumber: generateOrderNumber(),
+          paymentMethod,
+          coupon: couponId || undefined,
+          couponCode,
+          discountAmount: couponDiscount,
+          customerPhone,
+          deliveryAddress,
+        },
+      ],
+      { session },
+    );
+
+    if (coupon) {
       await Promise.all([
         couponModel.findByIdAndUpdate(
           coupon._id,
@@ -158,7 +235,6 @@ const createOrder = asyncHandler(async (req, res) => {
           },
           { session },
         ),
-
         couponUsageModel.create(
           [
             {
@@ -169,58 +245,21 @@ const createOrder = asyncHandler(async (req, res) => {
           ],
           { session },
         ),
-
-        cartModel.findOneAndDelete({ user: req.user.id }, { session }),
       ]);
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      throw new ApiError(500, error.message);
-    } finally {
-      session.endSession();
     }
 
-    return res.status(200).json(
-      new ApiResponse(200, "Order created successful", {
-        applied: true,
-        order,
-      }),
-    );
+    await cartModel.findOneAndDelete({ user: req.user.id }, { session });
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
   }
 
-
-  const platformSettings = await platformSettingsModel.findOne();
-  if (!platformSettings) {
-    throw new ApiError(404, "Platform settings not found");
-  }
-
-  const gstPercentage = platformSettings.gstPercentage;
-  const gstAmount = Math.round((totalAmount * gstPercentage) / 100);
-  let deliveryCharge = platformSettings.deliveryCharge;
-  const packagingCharge = platformSettings.packagingCharge;
-  const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
-
-  if (freeDeliveryAbove <= totalAmount) deliveryCharge = 0;
-
-  const finalAmount =
-    totalAmount + gstAmount + deliveryCharge + packagingCharge;
-
-  const order = await orderModel.create({
-    user: req.user.id,
-    restaurant: restaurantId,
-    restaurantName,
-    items: orderItems,
-    totalAmount: finalAmount,
-    orderNumber: generateOrderNumber(),
-    paymentMethod,
-    customerPhone: customerPhone,
-    deliveryAddress: deliveryAddress
-  });
-
-  await cartModel.findOneAndDelete({ user: req.user.id });
   return res.status(200).json(
     new ApiResponse(200, "Order created successful", {
-      applied: false,
+      applied,
       order,
     }),
   );
@@ -245,7 +284,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
   const orders = await orderModel
     .find(
       { user: req.user.id },
-      "orderNumber restaurantName totalAmount orderStatus createdAt",
+      "orderNumber restaurantName totalAmount orderStatus createdAt rejectionMsg",
     )
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -288,8 +327,7 @@ const getSingleOrder = asyncHandler(async (req, res) => {
   const order = await orderModel
     .findById(orderId)
     .select(
-      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt",
-    )
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt rejectionMsg")
     .populate({
       path: "items.menuItem",
       select: "image",
@@ -321,8 +359,23 @@ const cancelOrder = asyncHandler(async (req, res) => {
   if (order.orderStatus !== "PENDING") {
     throw new ApiError(409, "Only pending orders can be cancelled");
   }
-  order.orderStatus = "CANCELLED";
-  await order.save();
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    await restoreOrderStock(order.items, session);
+    order.orderStatus = "CANCELLED";
+    await order.save({ session });
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Order has been cancelled", order));
@@ -352,7 +405,7 @@ const getVendorOrder = asyncHandler(async (req, res) => {
   const totalPages = Math.ceil(totalOrders / limitNumber);
   const orders = await orderModel
     .find({ restaurant: restaurant._id })
-    .select("user items totalAmount orderNumber paymentMethod paymentStatus orderStatus createdAt customerPhone deliveryAddress discountAmount gstAmount packagingCharge deliveryCharge couponCode")
+    .select("user items totalAmount orderNumber paymentMethod paymentStatus orderStatus createdAt customerPhone deliveryAddress discountAmount gstAmount packagingCharge deliveryCharge couponCode rejectionMsg")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limitNumber)
@@ -411,7 +464,7 @@ const getSingleVendorOrder = asyncHandler(async (req, res) => {
   const order = await orderModel
     .findById(orderId)
     .select(
-      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt")
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt rejectionMsg")
     .populate([
       {
       path: "items.menuItem",
@@ -455,19 +508,38 @@ const changeOrderStatus = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Forbidden, you are not the owner of restaurant");
   }
 
-  if (order.orderStatus === "DELIVERED") {
-    throw new ApiError(409, "Order is delivered,no more changes can be made");
+  if (["DELIVERED", "CANCELLED", "REJECTED"].includes(order.orderStatus)) {
+    throw new ApiError(409, "Order is in a final state, no more changes can be made");
   }
 
-  if(order.orderStatus === "REJECTED"){
+  if(orderStatus === "REJECTED"){
     const { rejectionMsg } = req.body;
     if (!rejectionMsg || rejectionMsg.trim() === "") {
       throw new ApiError(400, "Rejection message is required");
     }
     order.rejectionMsg = rejectionMsg;
   }
-  order.orderStatus = orderStatus;
-  await order.save();
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    if (orderStatus === "REJECTED") {
+      await restoreOrderStock(order.items, session);
+    }
+
+    order.orderStatus = orderStatus;
+    await order.save({ session });
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
   return res.status(200).json(
     new ApiResponse(200, "Order status updated successfuly", {
       orderNumber: order.orderNumber,
