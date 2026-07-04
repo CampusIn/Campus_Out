@@ -44,7 +44,7 @@ const reserveOrderStock = async (orderItems, session) => {
         },
       },
       {
-        new: true,
+        returnDocument: 'after',
         session,
       },
     );

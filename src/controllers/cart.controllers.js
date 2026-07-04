@@ -99,7 +99,7 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
 
   await cart.populate({
     path: "items.menuItem",
-    select: "name price image",
+    select: "name price image stockQty",
   });
 
   cart.items = cart.items.filter((item) => {
