@@ -392,6 +392,17 @@ const getVendorOrder = asyncHandler(async (req, res) => {
   );
 });
 
+const getPlatformSettingsVendor = asyncHandler(async (req, res) => {
+  const platformSettings = await platformSettingsModel
+    .findOne()
+    .select('-updatedAt -createdAt -__v')
+  if (!platformSettings) {
+    throw new ApiError(404, 'Platform settings not found')
+  }
+
+  return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
+});
+
 const getSingleVendorOrder = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
@@ -611,5 +622,6 @@ export default {
   changeOrderStatus,
   applyCoupon,
   getAllCoupons,
-  getPlatformSettingsUser
+  getPlatformSettingsUser,
+  getPlatformSettingsVendor
 };

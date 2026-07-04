@@ -349,6 +349,17 @@ const editSettings = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Settings updated successfully", settings));
 });
 
+const getPlatformSettingsAdmin = asyncHandler(async (req, res) => {
+  const platformSettings = await platformSettingsModel
+    .findOne()
+    .select('-updatedAt -createdAt -__v')
+  if (!platformSettings) {
+    throw new ApiError(404, 'Platform settings not found')
+  }
+
+  return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
+});
+
 const createCoupons = asyncHandler(async (req, res) => {
   let {
     code,
@@ -974,4 +985,5 @@ export default {
   updateBanner,
   updateBannerStatus,
   topRestaurants,
+  getPlatformSettingsAdmin
 };

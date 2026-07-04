@@ -97,6 +97,13 @@ adminRouter.patch(
   adminController.editSettings,
 );
 
+adminRouter.get(
+  "/view/settings",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getPlatformSettingsAdmin,
+)
+
 adminRouter.post(
   "/coupons",
   authMiddleware,

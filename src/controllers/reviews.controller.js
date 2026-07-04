@@ -6,7 +6,6 @@ import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import updateRestaurantRating from "../utils/updateRestaurantReview.utils.js";
 import mongoose from "mongoose";
-import { response } from "express";
 
 const createReview = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
