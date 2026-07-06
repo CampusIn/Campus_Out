@@ -42,6 +42,6 @@ marketPlaceCategorySchema.index({
     createdAt:-1
 })
 
-const marketPlaceCategoryModel = mongoose.model('MarketPlace',marketPlaceCategorySchema)
+const marketPlaceCategoryModel = mongoose.model('MarketPlaceCategory',marketPlaceCategorySchema)
 
 export default marketPlaceCategoryModel

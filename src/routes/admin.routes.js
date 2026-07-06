@@ -10,6 +10,7 @@ import bannerValidationRules from "../validators/banner.validators.js";
 import bannerUpdateValidationRules from "../validators/bannerUpdate.validators.js";
 import marketPlaceCategoryValidationRules from "../validators/marketPlaceCategory.validators.js";
 import marketPlaceCategoryUpdateValidationRules from "../validators/marketPlaceCategoryUpdate.validators.js";
+import marketPlaceProductsValidationRules from "../validators/marketPlaceProducts.validators.js";
 import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
@@ -104,7 +105,7 @@ adminRouter.get(
   authMiddleware,
   roleMiddleware("admin"),
   adminController.getPlatformSettingsAdmin,
-)
+);
 
 adminRouter.post(
   "/coupons",
@@ -229,52 +230,75 @@ adminRouter.get(
   "/orders/:orderId/invoice",
   authMiddleware,
   roleMiddleware("admin"),
-  adminController.generateInvoice
+  adminController.generateInvoice,
 );
 
 adminRouter.get(
   "/abandoned-carts",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.abandonCart
+  roleMiddleware("admin"),
+  adminController.abandonCart,
 );
 
 adminRouter.post(
   "/abandoned-carts/:userId/remind",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.sendReminder
+  roleMiddleware("admin"),
+  adminController.sendReminder,
 );
 
 adminRouter.post(
   "/marketplace/categories",
   authMiddleware,
-  roleMiddleware('admin'),
-  upload.single('image'),
+  roleMiddleware("admin"),
+  upload.single("image"),
   marketPlaceCategoryValidationRules,
-  adminController.createCategory
+  adminController.createCategory,
 );
 
 adminRouter.get(
   "/marketplace/categories",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.getAllCategories
+  roleMiddleware("admin"),
+  adminController.getAllCategories,
 );
 
 adminRouter.get(
   "/marketplace/categories/:categoryId",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.getCategoryById
+  roleMiddleware("admin"),
+  adminController.getCategoryById,
 );
 
 adminRouter.patch(
   "/marketplace/categories/:categoryId",
   authMiddleware,
-  roleMiddleware('admin'),
-  upload.single('image'),
+  roleMiddleware("admin"),
+  upload.single("image"),
   marketPlaceCategoryUpdateValidationRules,
-  adminController.updateCategory
+  adminController.updateCategory,
+);
+
+adminRouter.post(
+  "/marketplace/products",
+  authMiddleware,
+  roleMiddleware("admin"),
+  upload.array("images", 5),
+  marketPlaceCategoryValidationRules,
+  adminController.createProducts,
+);
+
+adminRouter.get(
+  "/marketplace/products",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getAllProducts,
+);
+
+adminRouter.get(
+  "/marketplace/products/:productId",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getProductById,
 );
 export default adminRouter;

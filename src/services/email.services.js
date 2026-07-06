@@ -80,7 +80,7 @@ const sendEmail = async (to, subject, text, html) => {
     throw new Error(data.error?.message || "Failed to send email");
   }
 
-  console.log("Message sent: %s", data.id);
+  
   return data;
 };
 

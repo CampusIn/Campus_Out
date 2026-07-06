@@ -11,14 +11,14 @@ import mongoose from "mongoose";
 import announcementModel from "../models/anouncement.models.js";
 import bannerModel from "../models/banners.models.js";
 import cartModel from "../models/cart.models.js";
-import marketPlaceCategoryModel from "../models/marketPlaceCategory.models.js"
+import marketPlaceCategoryModel from "../models/marketPlaceCategory.models.js";
+import marketPlaceProductsModel from "../models/marketPlaceProducts.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 import generateInvoicePDF from "../services/invoice.services.js";
 import { sendEmail } from "../services/email.services.js";
 import reminderHTML from "../utils/reminderHTML.utils.js";
 import config from "../config/config.js";
-
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -359,12 +359,20 @@ const editSettings = asyncHandler(async (req, res) => {
 const getPlatformSettingsAdmin = asyncHandler(async (req, res) => {
   const platformSettings = await platformSettingsModel
     .findOne()
-    .select('-updatedAt -createdAt -__v')
+    .select("-updatedAt -createdAt -__v");
   if (!platformSettings) {
-    throw new ApiError(404, 'Platform settings not found')
+    throw new ApiError(404, "Platform settings not found");
   }
 
-  return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Platform settings fetched successfully",
+        platformSettings,
+      ),
+    );
 });
 
 const createCoupons = asyncHandler(async (req, res) => {
@@ -964,23 +972,21 @@ const topRestaurants = asyncHandler(async (req, res) => {
 });
 
 const generateInvoice = asyncHandler(async (req, res) => {
-  const {orderId} = req.params;
+  const { orderId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     throw new ApiError(400, "Invalid Order ID");
   }
 
-  const order = await orderModel
-    .findById(orderId)
-    .populate([
-      {
-        path: "user",
-        select: "username email",
-      },
-      {
-        path: "restaurant",
-        select: "restaurantName location phone",
-      },
-    ]);
+  const order = await orderModel.findById(orderId).populate([
+    {
+      path: "user",
+      select: "username email",
+    },
+    {
+      path: "restaurant",
+      select: "restaurantName location phone",
+    },
+  ]);
   if (!order) {
     throw new ApiError(404, "Order not found");
   }
@@ -994,96 +1000,96 @@ const generateInvoice = asyncHandler(async (req, res) => {
   res.send(pdfBuffer);
 });
 
-const abandonCart = asyncHandler(async(req,res)=>{
-  const { page = 1, limit = 5} = req.query
-  const pageNumber = parseInt(page) || 1
-  const limitNumber = parseInt(limit) || 5
-  const skip = (pageNumber - 1) * limitNumber
-  let filter = {}
+const abandonCart = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
 
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate()- 1)
-   filter.updatedAt = {
-    $lte:yesterday
-  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  filter.updatedAt = {
+    $lte: yesterday,
+  };
 
   filter.$expr = {
-    $gt:[{$size:'$items'},0]
-}
-  
-
+    $gt: [{ $size: "$items" }, 0],
+  };
 
   const [carts, totalCarts] = await Promise.all([
     cartModel
-    .find(filter)
-    .populate({
-      path:'user',
-      select:'username email'
-    })
-    .sort({updatedAt:1})
-    .select('items totalAmount updatedAt')
-    .skip(skip)
-    .limit(limitNumber),
+      .find(filter)
+      .populate({
+        path: "user",
+        select: "username email",
+      })
+      .sort({ updatedAt: 1 })
+      .select("items totalAmount updatedAt")
+      .skip(skip)
+      .limit(limitNumber),
 
-    cartModel.countDocuments(filter)
-  ])
+    cartModel.countDocuments(filter),
+  ]);
 
-  const totalPages = Math.ceil(totalCarts/limitNumber)
+  const totalPages = Math.ceil(totalCarts / limitNumber);
 
-  if(carts.length === 0){
-    return res.status(200).json(new ApiResponse(200,'No Abandoned carts to fetch',{
-    carts,
-    pagination:{
-      'page':pageNumber,
-      'limit':limitNumber,
-      totalCarts,
-      totalPages
-    }
-  }))
+  if (carts.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No Abandoned carts to fetch", {
+        carts,
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalCarts,
+          totalPages,
+        },
+      }),
+    );
   }
 
-
-  return res.status(200).json(new ApiResponse(200,'Abandoned carts fetched successfully',{
-    carts,
-    pagination:{
-      'page':pageNumber,
-      'limit':limitNumber,
-      totalCarts,
-      totalPages
-    }
-  }))
+  return res.status(200).json(
+    new ApiResponse(200, "Abandoned carts fetched successfully", {
+      carts,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalCarts,
+        totalPages,
+      },
+    }),
+  );
 });
 
-const sendReminder = asyncHandler(async(req,res) =>{
-  const {userId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(userId)){
-    throw new ApiError(400,'User ID is invalid')
+const sendReminder = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "User ID is invalid");
   }
 
-  const user = await userModel.findById(userId)
-  if(!user){
-    throw new ApiError(404,'User does not exists')
+  const user = await userModel.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User does not exists");
   }
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate()- 1)
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
   const cart = await cartModel.findOne({
-    user:userId,
-    $expr:{$gt:[{$size:'$items'},0]},
-    updatedAt:{$lte:yesterday}
-  
-  })
-  if(!cart){
-    throw new ApiError(404,'Cart does not exists')
+    user: userId,
+    $expr: { $gt: [{ $size: "$items" }, 0] },
+    updatedAt: { $lte: yesterday },
+  });
+  if (!cart) {
+    throw new ApiError(404, "Cart does not exists");
   }
 
-  if(!user.email){
-    throw new ApiError(400,'User does not have a valid email ID')
+  if (!user.email) {
+    throw new ApiError(400, "User does not have a valid email ID");
   }
 
   try {
     await sendEmail(
       user.email,
-      'Hey Cutie you left something delicious behind!',
+      "Hey Cutie you left something delicious behind!",
       `Hi Joel,
 
 You left some delicious items in your CAMPUSIN cart.
@@ -1093,203 +1099,399 @@ Complete your order here:
 ${config.CLIENT_ID}/cart
 
 Team CAMPUSIN`,
-      reminderHTML()
-
-    )
+      reminderHTML(),
+    );
   } catch (error) {
-    throw new ApiError(400,'Error in sending email')
+    throw new ApiError(400, "Error in sending email");
   }
 
-  return res.status(200).json(new ApiResponse(200,'Email has been sent successfully'))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Email has been sent successfully"));
 });
-
 
 //MarketPlace admin controlls starts here
 
-const createCategory = asyncHandler(async(req,res)=>{
-  const {name, description, priority} = req.body
-  console.log(name)
-  const imageLocalPath = req.file?.path
-  if(!imageLocalPath){
-    throw new ApiError(400, 'Image file is not provided')
+const createCategory = asyncHandler(async (req, res) => {
+  const { name, description, priority } = req.body;
+  console.log(name);
+  const imageLocalPath = req.file?.path;
+  if (!imageLocalPath) {
+    throw new ApiError(400, "Image file is not provided");
   }
 
-  const normalisedName = name.trim().toUpperCase()
+  const normalisedName = name.trim().toUpperCase();
   const isExists = await marketPlaceCategoryModel.findOne({
-    name:normalisedName
-  })
+    name: normalisedName,
+  });
 
-  if(isExists){
-    throw new ApiError(409,'Category already exists')
+  if (isExists) {
+    throw new ApiError(409, "Category already exists");
   }
 
-  const imageUrl = await uploadOnCloudinary(imageLocalPath)
+  const imageUrl = await uploadOnCloudinary(imageLocalPath);
 
   const category = await marketPlaceCategoryModel.create({
-    name:normalisedName,
+    name: normalisedName,
     description,
     priority,
-    image:imageUrl,
-    createdBy:req.user.id
-  })
+    image: imageUrl,
+    createdBy: req.user.id,
+  });
 
-  return res.status(201).json(new ApiResponse(201,'Category created successfully',category))
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Category created successfully", category));
 });
 
-const getAllCategories = asyncHandler(async(req,res)=>{
-  const {search, isActive, page=1, limit=5} = req.query
-  const pageNumber = parseInt(page) || 1
-  const limitNumber = parseInt(limit) || 5
-  if(pageNumber <1 || limitNumber<1){
-    throw new ApiError(400,'Page number or Limit number is not valid')
+const getAllCategories = asyncHandler(async (req, res) => {
+  const { search, isActive, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Page number or Limit number is not valid");
   }
-  const skip = (pageNumber - 1) * limitNumber
-  let filter = {}
-  if(search){
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  if (search) {
     filter.name = {
-      $regex:search,
-      $options:'i'
-    }
+      $regex: search,
+      $options: "i",
+    };
   }
 
-  if(isActive === 'true'){
-    filter.isActive = true
-  }else if(isActive === 'false'){
-    filter.isActive = false
+  if (isActive === "true") {
+    filter.isActive = true;
+  } else if (isActive === "false") {
+    filter.isActive = false;
   }
 
   const [categories, totalCategories] = await Promise.all([
     marketPlaceCategoryModel
       .find(filter)
       .sort({
-        priority:-1,
-        createdAt:-1
-      }).populate({
-        path:'createdBy',
-        select:'username'
+        priority: -1,
+        createdAt: -1,
       })
-      .select('name description image priority isActive createdBy createdAt')
+      .populate({
+        path: "createdBy",
+        select: "username",
+      })
+      .select("name description image priority isActive createdBy createdAt")
       .skip(skip)
       .limit(limitNumber),
 
-      marketPlaceCategoryModel.countDocuments(filter)
-  ])
+    marketPlaceCategoryModel.countDocuments(filter),
+  ]);
 
-  const totalPages = Math.ceil(totalCategories/limitNumber)
-  if(categories.length === 0){
-    return res.status(200).json(new ApiResponse(200,'No categories found',{
-      categories,
-      pagination:{
-        page:pageNumber,
-        limit:limitNumber,
-        totalCategories,
-        totalPages
-      }
-    }))
+  const totalPages = Math.ceil(totalCategories / limitNumber);
+  if (categories.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No categories found", {
+        categories,
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalCategories,
+          totalPages,
+        },
+      }),
+    );
   }
 
-  return res.status(200).json(new ApiResponse(200,'Categories fetched successfully',{
-    categories,
-    pagination:{
-      page:pageNumber,
-      limit:limitNumber,
-      totalCategories,
-      totalPages
-    }
-  }))
-
-
+  return res.status(200).json(
+    new ApiResponse(200, "Categories fetched successfully", {
+      categories,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalCategories,
+        totalPages,
+      },
+    }),
+  );
 });
 
-const getCategoryById = asyncHandler(async(req,res)=>{
-  const {categoryId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(categoryId)){
-    throw new ApiError(400,'Invalid category ID')
+const getCategoryById = asyncHandler(async (req, res) => {
+  const { categoryId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    throw new ApiError(400, "Invalid category ID");
   }
 
   const category = await marketPlaceCategoryModel
     .findById(categoryId)
     .populate({
-      path:'createdBy',
-      select:'username'
+      path: "createdBy",
+      select: "username",
     })
-    .select('name description image priority isActive createdBy createdAt updatedAt')
-  if(!category){
-    throw new ApiError(404,'Category not found')
+    .select(
+      "name description image priority isActive createdBy createdAt updatedAt",
+    );
+  if (!category) {
+    throw new ApiError(404, "Category not found");
   }
 
-  return res.status(200).json(new ApiResponse(200,'Category fetched successfully',category))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Category fetched successfully", category));
 });
 
-const updateCategory = asyncHandler(async(req,res)=>{
-  const {categoryId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(categoryId)){
-    throw new ApiError(400,'Invalid category ID')
+const updateCategory = asyncHandler(async (req, res) => {
+  const { categoryId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    throw new ApiError(400, "Invalid category ID");
   }
 
-  const category = await marketPlaceCategoryModel.findById(categoryId)
-  if(!category){
-    throw new ApiError(404,'Category not found')
+  const category = await marketPlaceCategoryModel.findById(categoryId);
+  if (!category) {
+    throw new ApiError(404, "Category not found");
   }
-  const {name} = req.body
-  if(name){
-    const normalisedName = name.trim().toUpperCase()
+  const { name } = req.body;
+  if (name) {
+    const normalisedName = name.trim().toUpperCase();
     const isNameExists = await marketPlaceCategoryModel.findOne({
-    name: normalisedName,
-    _id:{$ne:category._id}
-  })
+      name: normalisedName,
+      _id: { $ne: category._id },
+    });
 
-  if(isNameExists){
-    throw new ApiError(409,' Category name already exists')
-  }
-
-  category.name = normalisedName
-}
-
-  const allowedUpdates = [
-    'priority',
-    'description'
-  ]
-
-  allowedUpdates.forEach((field)=>{
-    if(req.body[field]!==undefined){
-      category[field] = req.body[field]
+    if (isNameExists) {
+      throw new ApiError(409, " Category name already exists");
     }
-  })
 
-  const imageLocalPath = req.file?.path
-  if(imageLocalPath){
-    const imageUrl = await uploadOnCloudinary(imageLocalPath)
-    category.image = imageUrl
+    category.name = normalisedName;
   }
 
-  await category.save()
-  return res.status(200).json(new ApiResponse(200,'Category updated successfully',category))
+  const allowedUpdates = ["priority", "description"];
 
+  allowedUpdates.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      category[field] = req.body[field];
+    }
+  });
+
+  const imageLocalPath = req.file?.path;
+  if (imageLocalPath) {
+    const imageUrl = await uploadOnCloudinary(imageLocalPath);
+    category.image = imageUrl;
+  }
+
+  await category.save();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Category updated successfully", category));
 });
 
-const updateCategoryStatus= asyncHandler(async(req,res)=>{
-  const {categoryId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(categoryId)){
-    throw new ApiError(400,'Invalid category ID')
+const updateCategoryStatus = asyncHandler(async (req, res) => {
+  const { categoryId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    throw new ApiError(400, "Invalid category ID");
   }
 
-  const category = await marketPlaceCategoryModel.findById(categoryId)
-  if(!category){
-    throw new ApiError(404,'Category does not exists')
+  const category = await marketPlaceCategoryModel.findById(categoryId);
+  if (!category) {
+    throw new ApiError(404, "Category does not exists");
   }
-  
-  category.isActive = !category.isActive
-  await category.save()
 
-  return res.status(200).json(new ApiResponse(200,'Category status updates successfully', {
-    status:category.isActive,
-    categoryId: category._id
-  }))
+  category.isActive = !category.isActive;
+  await category.save();
 
+  return res.status(200).json(
+    new ApiResponse(200, "Category status updates successfully", {
+      status: category.isActive,
+      categoryId: category._id,
+    }),
+  );
 });
 
+//Product related APIs of Marketplace
 
+const createProducts = asyncHandler(async (req, res) => {
+  const {
+    category,
+    name,
+    description,
+    price,
+    stock,
+    condition,
+    sellerPhoneNumber,
+  } = req.body;
+  const imageLocalPath = req.files;
+  if (!imageLocalPath || imageLocalPath.length === 0) {
+    throw new ApiError(400, "Atlast one image is required");
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(category)) {
+    throw new ApiError(400, "Invalid category ID");
+  }
+
+  const IsCategoryExists = await marketPlaceCategoryModel.findById(category);
+  if (!IsCategoryExists) {
+    throw new ApiError(404, "Category does not exists");
+  }
+
+  if (!IsCategoryExists.isActive) {
+    throw new ApiError(400, "Category is inactive");
+  }
+
+  const normalisedName = name.trim().toUpperCase();
+  const isDuplicateProduct = await marketPlaceProductsModel.findOne({
+    name: normalisedName,
+    category,
+  });
+
+  if (isDuplicateProduct) {
+    throw new ApiError(409, "Similar product exists");
+  }
+
+  let images = [];
+  try {
+    images = await Promise.all(
+      imageLocalPath.map((file) => uploadOnCloudinary(file.path)),
+    );
+  } catch (error) {
+    throw new ApiError(500, "Failed to upload images");
+  }
+
+  const product = await marketPlaceProductsModel.create({
+    name: normalisedName,
+    category,
+    description,
+    price,
+    stock,
+    condition,
+    images,
+    createdBy: req.user.id,
+    sellerPhoneNumber,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, "Product created successfully", product));
+});
+
+const getAllProducts = asyncHandler(async (req, res) => {
+  const {
+    search,
+    isActive,
+    category,
+    condition,
+    page = 1,
+    limit = 5,
+  } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Page number or Limit number is invalid");
+  }
+
+  const skip = (pageNumber - 1) * limitNumber;
+  let filter = {};
+  if (search) {
+    filter.name = {
+      $regex: search,
+      $options: "i",
+    };
+  }
+  if (isActive === "true") {
+    filter.isActive = true;
+  } else if (isActive === "false") {
+    filter.isActive = false;
+  }
+
+  const allowedTypes = ["NEW", "LIKE_NEW", "GOOD", "FAIR"];
+  if (allowedTypes.includes(condition)) {
+    filter.condition = condition;
+  }
+
+  if (category) {
+    if (!mongoose.Types.ObjectId.isValid(category)) {
+      throw new ApiError(400, "Category ID is not valid");
+    }
+    filter.category = category;
+  }
+
+  const [products, totalProducts] = await Promise.all([
+    marketPlaceProductsModel
+      .find(filter)
+      .populate([
+        {
+          path: "category",
+          select: "name",
+        },
+        {
+          path: "createdBy",
+          select: "username",
+        },
+      ])
+      .select(
+        "_id name price stock condition isActive category createdBy createdAt images",
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .skip(skip)
+      .limit(limitNumber),
+
+    marketPlaceProductsModel.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.ceil(totalProducts / limitNumber);
+  if (products.length === 0) {
+    return res.status(200).json(
+      new ApiResponse(200, "No products to fetch", {
+        products,
+        pagination: {
+          page: pageNumber,
+          limit: limitNumber,
+          totalProducts,
+          totalPages,
+        },
+      }),
+    );
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Products fetched successfully", {
+      products,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalProducts,
+        totalPages,
+      },
+    }),
+  );
+});
+
+const getProductById = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    throw new ApiError(400, "Product ID is invalid");
+  }
+
+  const product = await marketPlaceProductsModel
+    .findById(productId)
+    .populate([
+      {
+        path: "category",
+        select: "name",
+      },
+      {
+        path: "createdBy",
+        select: "username",
+      },
+    ])
+    .select(
+      "name price stock condition isActive category createdBy description images sellerPhoneNumber createdAt updatedAt",
+    );
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Product fetchd successfully", product));
+});
 
 export default {
   viewAdminDashboard,
@@ -1327,5 +1529,8 @@ export default {
   createCategory,
   getAllCategories,
   getCategoryById,
-  updateCategory
+  updateCategory,
+  createProducts,
+  getProductById,
+  getAllProducts,
 };
