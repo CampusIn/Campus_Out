@@ -11,6 +11,7 @@ import mongoose from "mongoose";
 import announcementModel from "../models/anouncement.models.js";
 import bannerModel from "../models/banners.models.js";
 import cartModel from "../models/cart.models.js";
+import marketPlaceCategoryModel from "../models/marketPlaceCategory.models.js"
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 import generateInvoicePDF from "../services/invoice.services.js";
@@ -1102,6 +1103,194 @@ Team CAMPUSIN`,
   return res.status(200).json(new ApiResponse(200,'Email has been sent successfully'))
 });
 
+
+//MarketPlace admin controlls starts here
+
+const createCategory = asyncHandler(async(req,res)=>{
+  const {name, description, priority} = req.body
+  console.log(name)
+  const imageLocalPath = req.file?.path
+  if(!imageLocalPath){
+    throw new ApiError(400, 'Image file is not provided')
+  }
+
+  const normalisedName = name.trim().toUpperCase()
+  const isExists = await marketPlaceCategoryModel.findOne({
+    name:normalisedName
+  })
+
+  if(isExists){
+    throw new ApiError(409,'Category already exists')
+  }
+
+  const imageUrl = await uploadOnCloudinary(imageLocalPath)
+
+  const category = await marketPlaceCategoryModel.create({
+    name:normalisedName,
+    description,
+    priority,
+    image:imageUrl,
+    createdBy:req.user.id
+  })
+
+  return res.status(201).json(new ApiResponse(201,'Category created successfully',category))
+});
+
+const getAllCategories = asyncHandler(async(req,res)=>{
+  const {search, isActive, page=1, limit=5} = req.query
+  const pageNumber = parseInt(page) || 1
+  const limitNumber = parseInt(limit) || 5
+  if(pageNumber <1 || limitNumber<1){
+    throw new ApiError(400,'Page number or Limit number is not valid')
+  }
+  const skip = (pageNumber - 1) * limitNumber
+  let filter = {}
+  if(search){
+    filter.name = {
+      $regex:search,
+      $options:'i'
+    }
+  }
+
+  if(isActive === 'true'){
+    filter.isActive = true
+  }else if(isActive === 'false'){
+    filter.isActive = false
+  }
+
+  const [categories, totalCategories] = await Promise.all([
+    marketPlaceCategoryModel
+      .find(filter)
+      .sort({
+        priority:-1,
+        createdAt:-1
+      }).populate({
+        path:'createdBy',
+        select:'username'
+      })
+      .select('name description image priority isActive createdBy createdAt')
+      .skip(skip)
+      .limit(limitNumber),
+
+      marketPlaceCategoryModel.countDocuments(filter)
+  ])
+
+  const totalPages = Math.ceil(totalCategories/limitNumber)
+  if(categories.length === 0){
+    return res.status(200).json(new ApiResponse(200,'No categories found',{
+      categories,
+      pagination:{
+        page:pageNumber,
+        limit:limitNumber,
+        totalCategories,
+        totalPages
+      }
+    }))
+  }
+
+  return res.status(200).json(new ApiResponse(200,'Categories fetched successfully',{
+    categories,
+    pagination:{
+      page:pageNumber,
+      limit:limitNumber,
+      totalCategories,
+      totalPages
+    }
+  }))
+
+
+});
+
+const getCategoryById = asyncHandler(async(req,res)=>{
+  const {categoryId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(categoryId)){
+    throw new ApiError(400,'Invalid category ID')
+  }
+
+  const category = await marketPlaceCategoryModel
+    .findById(categoryId)
+    .populate({
+      path:'createdBy',
+      select:'username'
+    })
+    .select('name description image priority isActive createdBy createdAt updatedAt')
+  if(!category){
+    throw new ApiError(404,'Category not found')
+  }
+
+  return res.status(200).json(new ApiResponse(200,'Category fetched successfully',category))
+});
+
+const updateCategory = asyncHandler(async(req,res)=>{
+  const {categoryId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(categoryId)){
+    throw new ApiError(400,'Invalid category ID')
+  }
+
+  const category = await marketPlaceCategoryModel.findById(categoryId)
+  if(!category){
+    throw new ApiError(404,'Category not found')
+  }
+  const {name} = req.body
+  if(name){
+    const normalisedName = name.trim().toUpperCase()
+    const isNameExists = await marketPlaceCategoryModel.findOne({
+    name: normalisedName,
+    _id:{$ne:category._id}
+  })
+
+  if(isNameExists){
+    throw new ApiError(409,' Category name already exists')
+  }
+
+  category.name = normalisedName
+}
+
+  const allowedUpdates = [
+    'priority',
+    'description'
+  ]
+
+  allowedUpdates.forEach((field)=>{
+    if(req.body[field]!==undefined){
+      category[field] = req.body[field]
+    }
+  })
+
+  const imageLocalPath = req.file?.path
+  if(imageLocalPath){
+    const imageUrl = await uploadOnCloudinary(imageLocalPath)
+    category.image = imageUrl
+  }
+
+  await category.save()
+  return res.status(200).json(new ApiResponse(200,'Category updated successfully',category))
+
+});
+
+const updateCategoryStatus= asyncHandler(async(req,res)=>{
+  const {categoryId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(categoryId)){
+    throw new ApiError(400,'Invalid category ID')
+  }
+
+  const category = await marketPlaceCategoryModel.findById(categoryId)
+  if(!category){
+    throw new ApiError(404,'Category does not exists')
+  }
+  
+  category.isActive = !category.isActive
+  await category.save()
+
+  return res.status(200).json(new ApiResponse(200,'Category status updates successfully', {
+    status:category.isActive,
+    categoryId: category._id
+  }))
+
+});
+
+
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -1134,5 +1323,9 @@ export default {
   getPlatformSettingsAdmin,
   generateInvoice,
   abandonCart,
-  sendReminder
+  sendReminder,
+  createCategory,
+  getAllCategories,
+  getCategoryById,
+  updateCategory
 };

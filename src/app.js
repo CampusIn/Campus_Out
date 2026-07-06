@@ -11,6 +11,7 @@ import vendorRouter from "./routes/vendor.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import deliveryRouter from "./routes/deliveryPartner.routes.js";
 import homePageRouter from "./routes/homepageCMS.routes.js";
+import marketRouter from "./routes/marketPlace.routes.js";
 import ApiError from "./utils/apiErrors.js";
 import passport from "./config/passport.js";
 import cors from "cors";
@@ -65,6 +66,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/user/homepage", homePageRouter);
+app.use("/api/marketplace",marketRouter)
 
 app.use((req, res) => {
   return res.status(404).json({

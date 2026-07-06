@@ -8,6 +8,8 @@ import couponUpdateValidationRules from "../validators/couponUpdate.validators.j
 import announcementValidationRules from "../validators/anouncement.validators.js";
 import bannerValidationRules from "../validators/banner.validators.js";
 import bannerUpdateValidationRules from "../validators/bannerUpdate.validators.js";
+import marketPlaceCategoryValidationRules from "../validators/marketPlaceCategory.validators.js";
+import marketPlaceCategoryUpdateValidationRules from "../validators/marketPlaceCategoryUpdate.validators.js";
 import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
@@ -235,12 +237,44 @@ adminRouter.get(
   authMiddleware,
   roleMiddleware('admin'),
   adminController.abandonCart
-)
+);
 
 adminRouter.post(
   "/abandoned-carts/:userId/remind",
   authMiddleware,
   roleMiddleware('admin'),
   adminController.sendReminder
-)
+);
+
+adminRouter.post(
+  "/marketplace/categories",
+  authMiddleware,
+  roleMiddleware('admin'),
+  upload.single('image'),
+  marketPlaceCategoryValidationRules,
+  adminController.createCategory
+);
+
+adminRouter.get(
+  "/marketplace/categories",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.getAllCategories
+);
+
+adminRouter.get(
+  "/marketplace/categories/:categoryId",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.getCategoryById
+);
+
+adminRouter.patch(
+  "/marketplace/categories/:categoryId",
+  authMiddleware,
+  roleMiddleware('admin'),
+  upload.single('image'),
+  marketPlaceCategoryUpdateValidationRules,
+  adminController.updateCategory
+);
 export default adminRouter;
