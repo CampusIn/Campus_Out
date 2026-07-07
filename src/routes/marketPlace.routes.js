@@ -12,11 +12,18 @@ marketRouter.get(
   marketPlaceController.getAllCategoriesByUser,
 );
 
+
 marketRouter.get(
-  "/products/:productId",
+  "/products",
   authMiddleware,
   roleMiddleware("user"),
   marketPlaceController.getAllProductsByUser,
 );
 
+marketRouter.get(
+  "/products/:productId",
+  authMiddleware,
+  roleMiddleware("user"),
+  marketPlaceController.getProductsByIdUser,
+);
 export default marketRouter;

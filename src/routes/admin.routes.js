@@ -281,7 +281,7 @@ adminRouter.patch(
 );
 
 adminRouter.patch(
-  "marketPlace/categories/:categoryId/status",
+  "/marketPlace/categories/:categoryId/status",
   authMiddleware,
   roleMiddleware('admin'),
   adminController.updateCategoryStatus
