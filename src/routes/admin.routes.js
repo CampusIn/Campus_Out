@@ -280,12 +280,19 @@ adminRouter.patch(
   adminController.updateCategory,
 );
 
+adminRouter.patch(
+  "marketPlace/categories/:categoryId/status",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.updateCategoryStatus
+)
+
 adminRouter.post(
   "/marketplace/products",
   authMiddleware,
   roleMiddleware("admin"),
   upload.array("images", 5),
-  marketPlaceCategoryValidationRules,
+  marketPlaceProductsValidationRules,
   adminController.createProducts,
 );
 
@@ -303,7 +310,7 @@ adminRouter.get(
   adminController.getProductById,
 );
 
-adminRouter.post(
+adminRouter.patch(
   "/marketplace/products/:productId",
   authMiddleware,
   roleMiddleware('admin'),
@@ -312,10 +319,11 @@ adminRouter.post(
   adminController.updateProduct
 );
 
-adminRouter.post(
+adminRouter.patch(
   "/marketplace/products/:productId/status",
   authMiddleware,
   roleMiddleware('admin'),
   adminController.updateProductStatus
-)
+);
+
 export default adminRouter;

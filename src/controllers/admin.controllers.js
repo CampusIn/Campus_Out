@@ -1614,6 +1614,7 @@ export default {
   getAllCategories,
   getCategoryById,
   updateCategory,
+  updateCategoryStatus,
   createProducts,
   getProductById,
   getAllProducts,

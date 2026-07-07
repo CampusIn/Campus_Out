@@ -13,7 +13,7 @@ marketRouter.get(
 );
 
 marketRouter.get(
-  "/products",
+  "/products/:productId",
   authMiddleware,
   roleMiddleware("user"),
   marketPlaceController.getAllProductsByUser,
