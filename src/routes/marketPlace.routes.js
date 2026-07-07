@@ -6,10 +6,17 @@ import roleMiddleware from "../middlewares/role.middleware.js";
 const marketRouter = Router();
 
 marketRouter.get(
-    "/categories",
-    authMiddleware,
-    roleMiddleware('user'),
-    marketPlaceController.getAllCategoriesByUser
-)
+  "/categories",
+  authMiddleware,
+  roleMiddleware("user"),
+  marketPlaceController.getAllCategoriesByUser,
+);
 
-export default marketRouter
+marketRouter.get(
+  "/products",
+  authMiddleware,
+  roleMiddleware("user"),
+  marketPlaceController.getAllProductsByUser,
+);
+
+export default marketRouter;

@@ -1114,7 +1114,6 @@ Team CAMPUSIN`,
 
 const createCategory = asyncHandler(async (req, res) => {
   const { name, description, priority } = req.body;
-  console.log(name);
   const imageLocalPath = req.file?.path;
   if (!imageLocalPath) {
     throw new ApiError(400, "Image file is not provided");
@@ -1493,6 +1492,91 @@ const getProductById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Product fetchd successfully", product));
 });
 
+const updateProduct = asyncHandler(async(req,res)=>{
+  const{productId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(productId)){
+    throw new ApiError(400,'Product ID is invalid')
+  }
+
+  const product = await marketPlaceProductsModel.findById(productId)
+  if(!product){
+    throw new ApiError(404,'Product not found')
+  }
+
+  const {categoryId} = req.body
+  const {name} = req.body
+
+  if(categoryId){
+    if(!mongoose.Types.ObjectId.isValid(categoryId)){
+      throw new ApiError(400,'Category ID is invalid')
+    }
+    const category = await marketPlaceCategoryModel.findOne({
+      _id:categoryId,
+      isActive:true
+    })
+    if(!category){
+      throw new ApiError(404,'Category does not exists')
+    }
+    product.category = categoryId
+  }
+
+  if(name){
+    const categoryToCheck = categoryId || product.category;
+    const normalisedName = name.trim().toUpperCase()
+    const isDuplicateProduct = await marketPlaceProductsModel.findOne({
+      category:categoryToCheck,
+      name:normalisedName,
+      _id:{$ne:productId}
+    })
+    if(isDuplicateProduct){
+      throw new ApiError(409,'Similar product exists')
+    }
+
+    product.name = normalisedName
+  }
+
+  const allowedTypes = ["description","price","stock","condition","sellerPhoneNumber"]
+  allowedTypes.forEach((field)=>{
+    if(req.body[field] !== undefined){
+    product[field] = req.body[field]
+    }
+  })
+
+  if(req.files && req.files.length>0){
+    try {
+      const imageLocalPathArray = req.files
+      let images = await Promise.all(
+        imageLocalPathArray.map((file)=>{
+           return uploadOnCloudinary(file.path)
+        })
+      )
+
+      product.images = images
+    } catch (error) {
+      throw new ApiError(500,'Failed to upload image')
+    }
+  }
+
+  await product.save()
+
+  return res.status(200).json(new ApiResponse(200,'Product updated successfully',product))
+});
+
+const updateProductStatus = asyncHandler(async(req,res)=>{
+  const{productId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(productId)){
+    throw new ApiError(400,'Product ID is invalid')
+  }
+  const product = await marketPlaceProductsModel.findById(productId)
+  if(!product){
+    throw new ApiError(404,'Product not found')
+  }
+  product.isActive = !product.isActive
+  await product.save()
+
+  return res.status(200).json(new ApiResponse(200,'Product status updated successfully',product.isActive))
+})
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -1533,4 +1617,6 @@ export default {
   createProducts,
   getProductById,
   getAllProducts,
+  updateProduct,
+  updateProductStatus
 };

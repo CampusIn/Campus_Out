@@ -11,6 +11,7 @@ import bannerUpdateValidationRules from "../validators/bannerUpdate.validators.j
 import marketPlaceCategoryValidationRules from "../validators/marketPlaceCategory.validators.js";
 import marketPlaceCategoryUpdateValidationRules from "../validators/marketPlaceCategoryUpdate.validators.js";
 import marketPlaceProductsValidationRules from "../validators/marketPlaceProducts.validators.js";
+import marketPlaceProductsUpdateValidationRules from "../validators/marketPlaceProductsUpdate.validators.js"
 import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
@@ -301,4 +302,20 @@ adminRouter.get(
   roleMiddleware("admin"),
   adminController.getProductById,
 );
+
+adminRouter.post(
+  "/marketplace/products/:productId",
+  authMiddleware,
+  roleMiddleware('admin'),
+  upload.array('images',5),
+  marketPlaceProductsUpdateValidationRules,
+  adminController.updateProduct
+);
+
+adminRouter.post(
+  "/marketplace/products/:productId/status",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.updateProductStatus
+)
 export default adminRouter;
