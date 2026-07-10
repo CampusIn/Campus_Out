@@ -3,8 +3,10 @@ import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import deliveryPartnerModel from "../models/deliveryPartner.models.js";
 import orderModel from "../models/order.models.js";
+import marketPlaceOrderModel from "../models/marketPlaceOrders.models.js";
 import mongoose from "mongoose";
 
+//Food orders//
 const createProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const isExisting = await deliveryPartnerModel.findOne({
@@ -235,6 +237,107 @@ const deliverOrder = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "delivered successfully", order));
 });
 
+//MarketPlace orders//
+
+const viewAllMarketPlaceOrders = asyncHandler(async (req, res) => {
+  const partnerId = req.user.id;
+  const deliveryPartner = await deliveryPartnerModel.findone({
+    user: partnerId,
+  });
+  if (!deliveryPartner) {
+    throw new ApiError(404, "Delivery partner not found");
+  }
+
+  const orders = await marketPlaceOrderModel
+    .find({
+      deliveryPartner: partnerId,
+    })
+    .populate({
+      path: "user",
+      select: "username",
+    })
+    .sort({ createdAt: -1 });
+
+  if (!orders || orders.length === 0) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "No orders to fetch ", orders));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Orders fetched successfully", orders));
+});
+
+const viewOrderById = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  const deliveryPartner = await deliveryPartnerModel.findOne({
+    user: req.user.id,
+  });
+
+  if (!deliveryPartner) {
+    throw new ApiError(404, "Delivery partner not found");
+  }
+
+  const order = await marketPlaceOrderModel.findById(orderId).populate([
+    {
+      path: "user",
+      select: "username",
+    },
+    {
+      path:"items.product",
+      select:"images"
+    }
+  ]);
+
+  if(!order){
+    throw new ApiError(404,"Order not found")
+  }
+
+  if(order.deliveryPartner.toString() !== deliveryPartner._id.toString()){
+    throw new ApiError(403,"You don't have access to this order")
+  }
+
+  return res.status(200).json(new ApiResponse(200,"Order fetched successfully",order))
+});
+
+const updateOrderStatus = asyncHandler(async(req,res)=>{
+  const{orderId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(orderId)){
+    throw new ApiError(400,"Invalid Order ID")
+  }
+
+  const deliveryPartner = await deliveryPartnerModel.findOne({
+    user:req.user.id
+  })
+
+  if(!deliveryPartner){
+    throw new ApiError(400,"Delivery partner not found")
+  }
+  const order = await marketPlaceOrderModel.findOne({
+    deliveryPartner:deliveryPartner._id,
+    _id:orderId
+  })
+
+  if(!order){
+    throw new ApiError(404,"Order not found")
+  }
+
+  if(order.orderStatus!=="OUT_FOR_DELIVERY"){
+    throw new ApiError(400,"Order must be OUT_FOR_DELIVERY before delivery")
+  }
+
+  order.orderStatus = "DELIVERED"
+  deliveryPartner.isAvailable = true
+  await Promise.all([order.save(), deliveryPartner.save()])
+
+  return res.status(200).json(new ApiResponse(200,"Order status updated successfully"))
+})
+
 export default {
   createProfile,
   assignPartner,
@@ -242,4 +345,7 @@ export default {
   viewOneOrder,
   pickUpOrder,
   deliverOrder,
+  viewAllMarketPlaceOrders,
+  viewOrderById,
+  updateOrderStatus
 };

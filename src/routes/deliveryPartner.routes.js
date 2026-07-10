@@ -49,4 +49,25 @@ deliveryRouter.patch(
   deliveryControllers.deliverOrder,
 );
 
+deliveryRouter.get(
+  "/marketplace/orders",
+  authMiddleware,
+  roleMiddleware("delivery_partner"),
+  deliveryControllers.viewAllMarketPlaceOrders
+);
+
+deliveryRouter.get(
+  "/marketplace/orders/:orderId",
+  authMiddleware,
+  roleMiddleware("delivery_partner"),
+  deliveryControllers.viewOrderById
+);
+
+deliveryRouter.patch(
+  "/marketplace/orders/:orderId/status",
+  authMiddleware,
+  roleMiddleware("delivery_partner"),
+  deliveryControllers.updateOrderStatus
+)
+
 export default deliveryRouter;

@@ -161,9 +161,9 @@ marketPlacOrderSchema.index({
   deliveryPartner: 1,
   orderStatus: 1,
 });
-const marketPlacOrderModel = mongoose.model(
+const marketPlaceOrderModel = mongoose.model(
   "MarketPlaceOrder",
   marketPlacOrderSchema,
 );
 
-export default marketPlacOrderModel;
+export default marketPlaceOrderModel;
