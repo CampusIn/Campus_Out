@@ -1,5 +1,5 @@
 import { Router } from "express";
-import restaurantController from "../controllers/restaurant.controller.js";
+import restaurantController from "../controllers/restaurant.controllers.js";
 import {
   restaurantValidationRules,
   restaurantStatusValidationRule,

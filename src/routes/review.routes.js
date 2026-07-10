@@ -1,5 +1,5 @@
 import { Router } from "express";
-import reviewsController from "../controllers/reviews.controller.js";
+import reviewsController from "../controllers/reviews.controllers.js";
 import { authMiddleware } from "../middlewares/auth.middlewares.js";
 import roleMiddleware from "../middlewares/role.middleware.js";
 import reviewValidationRules from "../validators/review.validators.js";
