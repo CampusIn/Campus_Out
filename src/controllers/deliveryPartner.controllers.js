@@ -241,7 +241,7 @@ const deliverOrder = asyncHandler(async (req, res) => {
 
 const viewAllMarketPlaceOrders = asyncHandler(async (req, res) => {
   const partnerId = req.user.id;
-  const deliveryPartner = await deliveryPartnerModel.findone({
+  const deliveryPartner = await deliveryPartnerModel.findOne({
     user: partnerId,
   });
   if (!deliveryPartner) {
@@ -250,7 +250,7 @@ const viewAllMarketPlaceOrders = asyncHandler(async (req, res) => {
 
   const orders = await marketPlaceOrderModel
     .find({
-      deliveryPartner: partnerId,
+      deliveryPartner: deliveryPartner._id,
     })
     .populate({
       path: "user",

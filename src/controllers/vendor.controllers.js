@@ -296,7 +296,7 @@ const bulkUpload = asyncHandler(async (req, res) => {
   );
 });
 
-const generateInvoice = asyncHandler(async (req, res) => {
+const generateInvoiceFood = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
@@ -344,5 +344,5 @@ export default {
   getAllMenu,
   lowStockItems,
   bulkUpload,
-  generateInvoice
+  generateInvoiceFood
 };

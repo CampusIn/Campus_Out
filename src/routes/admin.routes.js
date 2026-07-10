@@ -231,7 +231,7 @@ adminRouter.get(
   "/orders/:orderId/invoice",
   authMiddleware,
   roleMiddleware("admin"),
-  adminController.generateInvoice,
+  adminController.generateInvoiceFood,
 );
 
 adminRouter.get(

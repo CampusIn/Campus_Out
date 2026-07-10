@@ -973,7 +973,7 @@ const topRestaurants = asyncHandler(async (req, res) => {
     );
 });
 
-const generateInvoice = asyncHandler(async (req, res) => {
+const generateInvoiceFood = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     throw new ApiError(400, "Invalid Order ID");
@@ -1596,7 +1596,7 @@ const restoreMarketOrderStock = async (orderItems, session) => {
 };
 
 const getAllMarketPlaceOrdersAdmin = asyncHandler(async (req, res) => {
-  const { serach,status, page = 1, limit = 5 } = req.query;
+  const {status, page = 1, limit = 5 } = req.query;
   const pageNumber = parseInt(page) || 1;
   const limitNumber = parseInt(limit) || 5;
   if (pageNumber < 1 || limitNumber < 1) {
@@ -1620,14 +1620,6 @@ const getAllMarketPlaceOrdersAdmin = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Invalid status");
     }
     filter.orderStatus = status;
-  }
-
-  if (search) {
-    filter.items={
-      $regex:search,
-      $options:'i'
-
-    }
   }
 
   const skip = (pageNumber - 1) * limitNumber;
@@ -1886,7 +1878,7 @@ export default {
   updateBannerStatus,
   topRestaurants,
   getPlatformSettingsAdmin,
-  generateInvoice,
+  generateInvoiceFood,
   abandonCart,
   sendReminder,
   createCategory,

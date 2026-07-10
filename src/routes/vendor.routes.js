@@ -77,6 +77,6 @@ vendorRouter.get(
   "/orders/:orderId/invoice",
   authMiddleware,
   roleMiddleware('vendor'),
-  vendorControllers.generateInvoice
+  vendorControllers.generateInvoiceFood
 )
 export default vendorRouter;
