@@ -136,6 +136,49 @@ const calculateCouponDiscount = async (couponId, userId, subTotal) => {
   };
 };
 
+const redeemCouponForMarketOrder = async (coupon, userId, orderId, session) => {
+  if (!coupon) return;
+
+  try {
+    await couponUsageModel.create(
+      [
+        {
+          coupon: coupon._id,
+          user: userId,
+          order: orderId,
+        },
+      ],
+      { session },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new ApiError(400, "You have already used this coupon");
+    }
+
+    throw error;
+  }
+
+  const updatedCoupon = await couponModel.findOneAndUpdate(
+    {
+      _id: coupon._id,
+      usageCount: { $lt: coupon.usageLimit },
+    },
+    {
+      $inc: {
+        usageCount: 1,
+      },
+    },
+    {
+      session,
+      new: true,
+    },
+  );
+
+  if (!updatedCoupon) {
+    throw new ApiError(400, "Coupon usage limit is over");
+  }
+};
+
 const createMarketPlaceOrder = asyncHandler(async (req, res) => {
   const { paymentMethod, customerPhone, deliveryAddress, couponId } = req.body;
 
@@ -252,29 +295,7 @@ const createMarketPlaceOrder = asyncHandler(async (req, res) => {
       { session },
     );
 
-    if (coupon) {
-      await Promise.all([
-        couponModel.findByIdAndUpdate(
-          coupon._id,
-          {
-            $inc: {
-              usageCount: 1,
-            },
-          },
-          { session },
-        ),
-        couponUsageModel.create(
-          [
-            {
-              coupon: coupon._id,
-              user: req.user.id,
-              order: order._id,
-            },
-          ],
-          { session },
-        ),
-      ]);
-    }
+    await redeemCouponForMarketOrder(coupon, req.user.id, order._id, session);
 
     await marketCartModel.findOneAndDelete({ user: req.user.id }, { session });
     await session.commitTransaction();

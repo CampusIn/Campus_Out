@@ -659,12 +659,13 @@ const applyCoupon = asyncHandler(async (req, res) => {
     subTotalAfterDiscount + gstAmount + deliveryCharge + packagingCharge;
 
   return res.status(200).json(
-    new ApiResponse(200, "Final cart summary fetched successfully", {
+    new ApiResponse(200, "Coupon applied successfully", {
       applied: true,
       coupon: {
         code: coupon.code,
         couponId,
         couponDiscount,
+        isUsed: false,
       },
       pricing: {
         subTotal,
