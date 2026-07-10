@@ -13,6 +13,8 @@ import bannerModel from "../models/banners.models.js";
 import cartModel from "../models/cart.models.js";
 import marketPlaceCategoryModel from "../models/marketPlaceCategory.models.js";
 import marketPlaceProductsModel from "../models/marketPlaceProducts.models.js";
+import marketPlaceOrderModel from "../models/marketPlaceOrders.models.js";
+import deliveryPartnerModel from "../models/deliveryPartner.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 import generateInvoicePDF from "../services/invoice.services.js";
@@ -1577,6 +1579,283 @@ const updateProductStatus = asyncHandler(async(req,res)=>{
   return res.status(200).json(new ApiResponse(200,'Product status updated successfully',product.isActive))
 })
 
+const restoreMarketOrderStock = async (orderItems, session) => {
+  for (const item of orderItems) {
+    await marketPlaceProductsModel.updateOne(
+      {
+        _id: item.product,
+      },
+      {
+        $inc: {
+          stock: item.quantity,
+        },
+      },
+      { session },
+    );
+  }
+};
+
+const getAllMarketPlaceOrdersAdmin = asyncHandler(async (req, res) => {
+  const { serach,status, page = 1, limit = 5 } = req.query;
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 5;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid Page number or Limit number");
+  }
+
+  const validStatus = [
+    "PENDING",
+    "CONFIRMED",
+    "PREPARING",
+    "READY",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "CANCELLED",
+    "REJECTED",
+  ];
+
+  let filter = {};
+  if (status) {
+    if (!validStatus.includes(status)) {
+      throw new ApiError(400, "Invalid status");
+    }
+    filter.orderStatus = status;
+  }
+
+  if (search) {
+    filter.items={
+      $regex:search,
+      $options:'i'
+
+    }
+  }
+
+  const skip = (pageNumber - 1) * limitNumber;
+  const [orders, totalOrders] = await Promise.all([
+    marketPlaceOrderModel
+      .find(filter)
+      .select("user orderNumber categoryName pricing.finalAmount paymentMethod paymentStatus orderStatus customerPhone deliveryPartner createdAt rejectionMsg")
+      .skip(skip)
+      .limit(limitNumber)
+      .populate([
+        {
+          path: "user",
+          select: "username email",
+        },
+        {
+          path: "deliveryPartner",
+          select: "phoneNumber vehicleNumber",
+          populate: {
+            path: "user",
+            select: "username email",
+          },
+        },
+      ])
+      .sort({ createdAt: -1 }),
+
+    marketPlaceOrderModel.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.ceil(totalOrders / limitNumber);
+
+  return res.status(200).json(
+    new ApiResponse(200, "Marketplace orders fetched successfully", {
+      orders,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalOrders,
+        totalPages,
+      },
+    }),
+  );
+});
+
+const getMarketPlaceOrderByIdAdmin = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  const order = await marketPlaceOrderModel.findById(orderId).populate([
+    {
+      path: "user",
+      select: "username email phone",
+    },
+    {
+      path: "category",
+      select: "name description image",
+    },
+    {
+      path: "items.product",
+      select: "name description price images condition stock category",
+    },
+    {
+      path: "deliveryPartner",
+      select: "phoneNumber vehicleNumber isAvailable",
+      populate: {
+        path: "user",
+        select: "username email",
+      },
+    },
+  ]);
+
+  if (!order) {
+    throw new ApiError(404, "Marketplace order not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Marketplace order fetched successfully", { order }));
+});
+
+const updateMarketPlaceOrderStatusAdmin = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { orderStatus, rejectionMsg } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  const allowedStatus = [
+    "PENDING",
+    "CONFIRMED",
+    "PREPARING",
+    "READY",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "CANCELLED",
+    "REJECTED",
+  ];
+
+  if (!allowedStatus.includes(orderStatus)) {
+    throw new ApiError(400, "Invalid Order status");
+  }
+
+  const order = await marketPlaceOrderModel.findById(orderId);
+  if (!order) {
+    throw new ApiError(404, "Marketplace order not found");
+  }
+
+  if (["DELIVERED", "CANCELLED", "REJECTED"].includes(order.orderStatus)) {
+    throw new ApiError(409, "Order is in a final state, no more changes can be made");
+  }
+
+  if (orderStatus === "REJECTED" && (!rejectionMsg || rejectionMsg.trim() === "")) {
+    throw new ApiError(400, "Rejection message is required");
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    if (["CANCELLED", "REJECTED"].includes(orderStatus)) {
+      await restoreMarketOrderStock(order.items, session);
+    }
+
+    if (orderStatus === "REJECTED") {
+      order.rejectionMsg = rejectionMsg;
+    } else {
+      order.rejectionMsg = null;
+    }
+
+    order.orderStatus = orderStatus;
+    await order.save({ session });
+
+    if (
+      ["DELIVERED", "CANCELLED", "REJECTED"].includes(orderStatus) &&
+      order.deliveryPartner
+    ) {
+      await deliveryPartnerModel.findByIdAndUpdate(
+        order.deliveryPartner,
+        {
+          isAvailable: true,
+        },
+        { session },
+      );
+    }
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, "Marketplace order status updated successfully", {
+      orderNumber: order.orderNumber,
+      orderStatus: order.orderStatus,
+      rejectionMsg: order.rejectionMsg,
+    }),
+  );
+});
+
+const assignMarketPlaceDeliveryPartnerAdmin = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { deliveryPartnerId } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+    throw new ApiError(400, "Invalid Delivery Partner ID");
+  }
+
+  const order = await marketPlaceOrderModel.findById(orderId);
+  if (!order) {
+    throw new ApiError(404, "Marketplace order not found");
+  }
+
+  const assignableStatuses = ["CONFIRMED", "PREPARING", "READY"];
+  if (!assignableStatuses.includes(order.orderStatus)) {
+    throw new ApiError(
+      400,
+      `Order must be CONFIRMED, PREPARING, or READY before assigning delivery. Current status: ${order.orderStatus}`,
+    );
+  }
+
+  if (order.deliveryPartner) {
+    throw new ApiError(400, "Delivery partner already assigned");
+  }
+
+  const deliveryPartner =
+    await deliveryPartnerModel.findById(deliveryPartnerId);
+  if (!deliveryPartner) {
+    throw new ApiError(404, "Delivery partner does not exist");
+  }
+
+  if (!deliveryPartner.isAvailable) {
+    throw new ApiError(400, "Partner unavailable");
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    order.deliveryPartner = deliveryPartner._id;
+    await order.save({ session });
+
+    deliveryPartner.isAvailable = false;
+    await deliveryPartner.save({ session });
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Delivery partner assigned successfully", order),
+    );
+});
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -1619,5 +1898,9 @@ export default {
   getProductById,
   getAllProducts,
   updateProduct,
-  updateProductStatus
+  updateProductStatus,
+  getAllMarketPlaceOrdersAdmin,
+  getMarketPlaceOrderByIdAdmin,
+  updateMarketPlaceOrderStatusAdmin,
+  assignMarketPlaceDeliveryPartnerAdmin
 };

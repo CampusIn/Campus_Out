@@ -248,6 +248,34 @@ adminRouter.post(
   adminController.sendReminder,
 );
 
+adminRouter.get(
+  "/marketplace/orders",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getAllMarketPlaceOrdersAdmin,
+);
+
+adminRouter.get(
+  "/marketplace/orders/:orderId",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getMarketPlaceOrderByIdAdmin,
+);
+
+adminRouter.patch(
+  "/marketplace/orders/:orderId/status",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.updateMarketPlaceOrderStatusAdmin,
+);
+
+adminRouter.patch(
+  "/marketplace/orders/:orderId/assign-delivery",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.assignMarketPlaceDeliveryPartnerAdmin,
+);
+
 adminRouter.post(
   "/marketplace/categories",
   authMiddleware,
