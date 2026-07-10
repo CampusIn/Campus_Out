@@ -13,6 +13,7 @@ import deliveryRouter from "./routes/deliveryPartner.routes.js";
 import homePageRouter from "./routes/homepageCMS.routes.js";
 import marketRouter from "./routes/marketPlace.routes.js";
 import marketCartRouter from "./routes/marketCart.routes.js";
+import marketPlaceOrdersRouter from "./routes/marketPlace.Orders.routes.js";
 import ApiError from "./utils/apiErrors.js";
 import passport from "./config/passport.js";
 import cors from "cors";
@@ -67,8 +68,9 @@ app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/vendor", vendorRouter);
 app.use("/api/user/homepage", homePageRouter);
-app.use("/api/marketplace",marketRouter)
-app.use("/api/marketplace/",marketCartRouter)
+app.use("/api/marketplace", marketRouter);
+app.use("/api/marketplace", marketCartRouter);
+app.use("/api/marketplace", marketPlaceOrdersRouter);
 
 app.use((req, res) => {
   return res.status(404).json({
