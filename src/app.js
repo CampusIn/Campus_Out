@@ -14,6 +14,7 @@ import homePageRouter from "./routes/homepageCMS.routes.js";
 import marketRouter from "./routes/marketPlace.routes.js";
 import marketCartRouter from "./routes/marketCart.routes.js";
 import marketPlaceOrdersRouter from "./routes/marketPlace.Orders.routes.js";
+import  {serverAdapter} from "./dashboard/bullBoard.js";
 import ApiError from "./utils/apiErrors.js";
 import passport from "./config/passport.js";
 import cors from "cors";
@@ -24,6 +25,7 @@ const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
 const allowedOrigins = [
   "http://localhost:5173",
   "https://campus-out-frontend.vercel.app",
+  "http://localhost:3000",
   normalizeOrigin(config.CLIENT_URL),
 ].filter(Boolean);
 
@@ -43,6 +45,11 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use(
+  "/admin/queues",
+  serverAdapter.getRouter()
+)
 
 app.get("/", (req, res) => {
   res.status(200).json({

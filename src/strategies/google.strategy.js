@@ -1,6 +1,8 @@
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import config from "../config/config.js";
 import userModel from "../models/user.models.js";
+import emailServices from "../services/emailQueue.services.js";
+import { generateWelcomeHTML } from "../utils/utils.js";
 
 const googleStrategy = new GoogleStrategy(
   {
@@ -29,10 +31,7 @@ const googleStrategy = new GoogleStrategy(
       if (user) {
         // Google account already linked?
         if (user.googleId && user.googleId !== googleId) {
-          return done(
-            new Error("Google account mismatch"),
-            null
-          );
+          return done(new Error("Google account mismatch"), null);
         }
 
         if (!user.googleId) {
@@ -43,6 +42,13 @@ const googleStrategy = new GoogleStrategy(
 
         if (!user.verified) {
           user.verified = true;
+          emailServices.queueWelcomeEmail({
+            to: email,
+            subject: "Welcome to CAMPUSIN",
+            text:
+              "Welcome to CAMPUSIN. Your account is verified and ready to use.",
+            welcomeHtml: generateWelcomeHTML(),
+          });
         }
 
         await user.save();
@@ -60,13 +66,19 @@ const googleStrategy = new GoogleStrategy(
         googleId,
         profilePicture,
       });
+      emailServices.queueWelcomeEmail({
+            to: email,
+            subject: "Welcome to CAMPUSIN",
+            text:
+              "Welcome to CAMPUSIN. Your account is verified and ready to use.",
+            welcomeHtml: generateWelcomeHTML(),
+          });
 
       return done(null, user);
-
     } catch (error) {
       return done(error, null);
     }
-  }
+  },
 );
 
 export default googleStrategy;

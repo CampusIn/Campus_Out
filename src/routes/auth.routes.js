@@ -30,6 +30,24 @@ authRouter.post(
   validators.verifyEmailValidationRules,
   authControllers.verifyEmail,
 );
+
+authRouter.post(
+  "/forgot-password",
+  validators.resendOtpValidationRules,
+  authControllers.forgotPassword
+);
+
+authRouter.post(
+  "/verify-reset-otp",
+  validators.verifyEmailValidationRules,
+  authControllers.verifyResetOtp
+);
+
+authRouter.post(
+  "/reset-password",
+  validators.resetPasswordValidationRules,
+  authControllers.resetPassword
+)
 authRouter.get("/me", authMiddleware, authControllers.getMe);
 authRouter.patch("/me", authMiddleware, authControllers.updateProfile);
 authRouter.get(

@@ -4,13 +4,16 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import config from "../config/config.js";
 import jwt from "jsonwebtoken";
-import { sendEmail } from "../services/email.services.js";
-import { generateOTP, generateOtpHTML } from "../utils/utils.js";
+import emailServices from "../services/emailQueue.services.js";
+import otpServices from "../services/otp.services.js";
+import redisServices from "../services/redis.services.js";
+import { generateOTP, generateOtpHTML, generateWelcomeHTML,generateForgotPasswordHTML } from "../utils/utils.js";
 import otpModel from "../models/otp.models.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
+import { REDIS_KEYS } from "../constants/redis.constants.js";
 
 const refreshTokenCookieOptions = {
   httpOnly: true,
@@ -49,27 +52,14 @@ const register = asyncHandler(async (req, res) => {
   const otp = generateOTP();
   const otpHTML = generateOtpHTML(otp);
   const otpHash = await bcrypt.hash(otp, 10);
-  await otpModel.create({
-    email,
-    user: newUser._id,
-    otpHash,
+  await otpServices.storeOTP(email, otp);
+
+  await emailServices.queueOTPEmail({
+    to: email,
+    subject: "Your OTP for CampusIn registration",
+    text: "OTP for CampusIn registration. Only valid for 5 minutes",
+    otpHtml: otpHTML,
   });
-
-  try {
-    await sendEmail(
-      email,
-      "Welcome to Campus In",
-      "Thank you for registering with us!",
-      otpHTML,
-    );
-  } catch (error) {
-    await otpModel.deleteMany({ email });
-
-    throw new ApiError(
-      500,
-      "Registration created, but OTP email could not be sent. Please check email service configuration.",
-    );
-  }
 
   res.status(201).json(
     new ApiResponse(
@@ -268,22 +258,19 @@ const verifyEmail = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email and OTP are required");
   }
 
-  const otpDoc = await otpModel.findOne({ email }).sort({ createdAt: -1 });
-  if (!otpDoc) {
-    throw new ApiError(400, "OTP expired or invalid");
+  const verifyOTP = await otpServices.verifyOTP(email,otp)
+  if(!verifyOTP){
+    throw new ApiError(400,"OTP verification failed")
   }
 
-  const isOtpValid = await bcrypt.compare(otp, otpDoc.otpHash);
-  if (!isOtpValid) {
-    throw new ApiError(400, "Invalid OTP");
-  }
-
-  const user = await userModel.findByIdAndUpdate(
-    otpDoc.user,
+  const user = await userModel.findOneAndUpdate(
+    { email },
     { verified: true },
     { returnDocument: "after" },
   );
-  await otpModel.deleteMany({ email });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
   const refreshToken = jwt.sign(
     {
       id: user._id,
@@ -316,6 +303,13 @@ const verifyEmail = asyncHandler(async (req, res) => {
     },
   );
 
+  await emailServices.queueWelcomeEmail({
+    to: email,
+    subject: "Welcome to CAMPUSIN",
+    text: "Welcome to CAMPUSIN. Your account is verified and ready to use.",
+    welcomeHtml: generateWelcomeHTML(),
+  })
+
   res.cookie("refreshToken", refreshToken, {
     ...refreshTokenCookieOptions,
   });
@@ -331,58 +325,145 @@ const verifyEmail = asyncHandler(async (req, res) => {
   );
 });
 
-const resendOTP = asyncHandler(async(req,res)=>{
-  const {email} = req.body
-  if(!email){
-    throw new ApiError(400,"Email is required")
+const resendOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    throw new ApiError(400, "Email is required");
   }
 
   const user = await userModel.findOne({
     email,
+  });
+
+  if (!user) {
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          "If the email is registered, an OTP will be sent",
+          {},
+        ),
+      );
+  }
+
+  if (user.verified) {
+    throw new ApiError(400, "Email is already verified");
+  }
+
+  const isCooldown = await redisServices.exists(`${REDIS_KEYS.COOLDOWN_KEY}:${email}`)
+
+  if(isCooldown){
+    throw new ApiError(429, "Please wait 60 seconds before requesting a new OTP");
+  }
+
+  await redisServices.set(`${REDIS_KEYS.COOLDOWN_KEY}:${email}`,'1',60)
+
+
+
+  const otp = generateOTP();
+  const otpHTML = generateOtpHTML(otp);
+  await otpServices.storeOTP(email,otp)
+
+  await emailServices.queueOTPEmail({
+    to:email,
+    subject:"Hey, didn't you verify your email yet? Here's your OTP",
+    text:"Please use the following OTP to verify your email:",
+    otpHtml:otpHTML
+  })
+  
+
+  return res.status(200).json(new ApiResponse(200, "OTP resent successfully"));
+});
+
+const forgotPassword = asyncHandler(async(req,res)=>{
+  const {email} = req.body
+  if(!email){
+    throw new ApiError(400,"User email is required")
+  }
+  const normalisedEmail = email.trim().toLowerCase()
+  const user = await userModel.findOne({
+    email:normalisedEmail,
+    verified:true
   })
 
   if(!user){
-    return res.status(200).json(new ApiResponse(200, "If the email is registered, an OTP will be sent", {}))
+    return res.status(200).json(new ApiResponse(200,"If an account exists with this email, an OTP has been sent."))
   }
-
-  if(user.verified){
-    throw new ApiError(400, "Email is already verified")
-  }
-
-  const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
-  const recentOtp = await otpModel.findOne({
-    email,
-    createdAt: { $gte: sixtySecondsAgo },
-  });
-
-  if (recentOtp) {
-    throw new ApiError(429, "Please wait before requesting a new OTP");
-  }
-
   const otp = generateOTP()
-  const otpHTML = generateOtpHTML(otp)
-  await otpModel.deleteMany({email})
-  const otpHash = await bcrypt.hash(otp,10)
-  await otpModel.create({
-    email,
-    user: user._id,
-    otpHash
+  const forgotHtml = generateForgotPasswordHTML(otp)
+  await otpServices.storeOTP(normalisedEmail,otp)
+  await emailServices.queueForgotEmail({
+    to:normalisedEmail,
+    subject:"Forgot your password? It happens.",
+    text:"Email regarding your password reset for CampusIn",
+    forgotHtml
   })
 
-  try{
-    await sendEmail(
-      email,
-      "Hey, didn't you verify your email yet? Here's your OTP",
-      "Please use the following OTP to verify your email:",
-      otpHTML
-    )
+  return res.status(200).json(new ApiResponse(200,"If an account exists with this email, an OTP has been sent."))
+
+
+});
+
+const verifyResetOtp = asyncHandler(async(req,res)=>{
+  const {email,otp} = req.body
+  console.log(typeof otp)
+  if(!otp){
+    throw new ApiError(400,"OTP is missing")
   }
-  catch(error){
-    await otpModel.deleteMany({email})
-    throw new ApiError(500, "Failed to send OTP")
+  if(!email){
+    throw new ApiError(400,"User email is required")
+  }
+  const normalisedEmail = email.trim().toLowerCase()
+
+  const user = await userModel.findOne({
+    email:normalisedEmail,
+    verified:true
+  })
+  if(!user){
+    throw new ApiError(404,"Invalid OTP or email")
   }
 
-  return res.status(200).json(new ApiResponse(200, "OTP resent successfully"));
+  const isVerified = await otpServices.verifyOTP(email,otp)
+  console.log(isVerified)
+  if(!isVerified){
+    throw new ApiError(400,"OTP verification failed")
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex')
+  await redisServices.set(`${REDIS_KEYS.RESET}:${resetToken}`,user._id.toString(),600)
+
+  return res.status(200).json(new ApiResponse(200,"Reset token set successfully",{
+    resetToken
+  }))
+
+});
+
+const resetPassword = asyncHandler(async(req,res)=>{
+  const{resetToken,password}= req.body
+  if(!password){
+    throw new ApiError(400,"New password is not enetered")
+  }
+
+  const userId = await redisServices.get(`${REDIS_KEYS.RESET}:${resetToken}`)
+  if(!userId){
+    throw new ApiError(400,"User ID not found")
+  }
+
+  const user = await userModel.findById(userId)
+  if(!user){
+    throw new ApiError(404,"Invalid Request")
+  }
+  const hashedPassword = await bcrypt.hash(password,10)
+  user.password = hashedPassword
+  await user.save()
+  await redisServices.remove(`${REDIS_KEYS.REQUEST}:${resetToken}`)
+  await sessionModel.deleteMany({
+    user:user._id
+  })
+
+  return res.status(200).json(new ApiResponse(200,"Password reset is successfull. Log in again to continue"))
+
 
 });
 
@@ -428,7 +509,6 @@ const googleLogin = asyncHandler(async (req, res) => {
     ...refreshTokenCookieOptions,
   });
   return res.redirect(`${config.CLIENT_URL}/auth/success?token=${accessToken}`);
-
 });
 
 const getMe = asyncHandler(async (req, res) => {
@@ -447,40 +527,38 @@ const getMe = asyncHandler(async (req, res) => {
   );
 });
 
-const updateProfile = asyncHandler(async(req,res)=>{
-  const userId = req.user.id
-  if(!mongoose.Types.ObjectId.isValid(userId)){
-    throw new ApiError(400, "Invalid user ID")
+const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new ApiError(400, "Invalid user ID");
   }
-  const{username} = req.body
-  const updateData = {}
-  if(username){
+  const { username } = req.body;
+  const updateData = {};
+  if (username) {
     const existingUser = await userModel.findOne({
       username,
-      _id:{ $ne: userId }
-    })
-    if(existingUser){
-      throw new ApiError(400, "Username already exists")
+      _id: { $ne: userId },
+    });
+    if (existingUser) {
+      throw new ApiError(400, "Username already exists");
     }
 
-    updateData.username = username
+    updateData.username = username;
   }
-const updatedUser = await userModel.findByIdAndUpdate(
-  userId,
-  updateData,
-  { new: true }
-)
-if(!updatedUser){
-  throw new ApiError(404, "User not found")
-}
-res.status(200).json(
-  new ApiResponse(200, "Profile updated successfully", {
-    id: updatedUser._id,
-    username: updatedUser.username,
-    email: updatedUser.email,
-    role: updatedUser.role
-  })
-)
+  const updatedUser = await userModel.findByIdAndUpdate(userId, updateData, {
+    new: true,
+  });
+  if (!updatedUser) {
+    throw new ApiError(404, "User not found");
+  }
+  res.status(200).json(
+    new ApiResponse(200, "Profile updated successfully", {
+      id: updatedUser._id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    }),
+  );
 });
 
 export default {
@@ -493,5 +571,8 @@ export default {
   googleLogin,
   getMe,
   updateProfile,
-  resendOTP
+  resendOTP,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword
 };

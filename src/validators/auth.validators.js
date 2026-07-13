@@ -83,9 +83,19 @@ const resendOtpValidationRules = [
   validateResult,
 ];
 
+const resetPasswordValidationRules = [
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters long"),
+  validateResult,
+]
+
 export default {
   registerValidationRules,
   loginValidationRules,
   verifyEmailValidationRules,
   resendOtpValidationRules,
+  resetPasswordValidationRules
 };

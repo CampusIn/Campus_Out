@@ -119,6 +119,33 @@ if (!process.env.CLIENT_URL) {
   }
 }
 
+if( !process.env.REDIS_HOST) {
+  try {
+    throw new Error("REDIS_HOST is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+if( !process.env.REDIS_PORT) {
+  try {
+    throw new Error("REDIS_PORT is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
+if( !process.env.REDIS_PASSWORD) {
+  try {
+    throw new Error("REDIS_PASSWORD is not defined in environment variables");
+  } catch (error) {
+    console.log(error.message);
+    process.exit(1);
+  }
+}
+
 
 
 
@@ -136,7 +163,10 @@ const config = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET:process.env.GOOGLE_CLIENT_SECRET,
   GOOGLE_CALLBACK_URL:process.env.GOOGLE_CALLBACK_URL,
-  CLIENT_URL:process.env.CLIENT_URL
+  CLIENT_URL:process.env.CLIENT_URL,
+  REDIS_HOST: process.env.REDIS_HOST,
+  REDIS_PORT: process.env.REDIS_PORT,
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD,
 };
 
 export default config;
