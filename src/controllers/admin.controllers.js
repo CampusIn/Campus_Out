@@ -21,6 +21,15 @@ import generateInvoicePDF from "../services/invoice.services.js";
 import { sendEmail } from "../services/email.services.js";
 import reminderHTML from "../utils/reminderHTML.utils.js";
 import config from "../config/config.js";
+import {
+  platformSettingsCached,
+  setPlatformSettingsCached,
+  deletePlatformSettingsCached
+} from "../services/platformSettingsCached.services.js";
+
+import { deletedBannerCached } from "../services/bannersCached.services.js";
+import { REDIS_KEYS } from "../constants/redis.constants.js";
+import { deleteAnnouncementsCached } from "../services/announcementsCached.services.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -352,6 +361,7 @@ const editSettings = asyncHandler(async (req, res) => {
 
   settings.updatedBy = req.user.id;
   await settings.save();
+  await deletePlatformSettingsCached()
 
   return res
     .status(200)
@@ -359,12 +369,26 @@ const editSettings = asyncHandler(async (req, res) => {
 });
 
 const getPlatformSettingsAdmin = asyncHandler(async (req, res) => {
+  const cachedSettings = await platformSettingsCached()
+  if(cachedSettings){
+    return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Platform settings fetched successfully",
+        cachedSettings,
+      ),
+    );
+  }
   const platformSettings = await platformSettingsModel
     .findOne()
     .select("-updatedAt -createdAt -__v");
   if (!platformSettings) {
     throw new ApiError(404, "Platform settings not found");
   }
+  await setPlatformSettingsCached(platformSettings)
+
 
   return res
     .status(200)
@@ -619,6 +643,8 @@ const createAnnouncements = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
+  await deleteAnnouncementsCached()
+
   return res
     .status(201)
     .json(
@@ -744,6 +770,7 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
   }
 
   await announcement.save();
+  await deleteAnnouncementsCached()
 
   return res
     .status(200)
@@ -765,6 +792,7 @@ const updateAnnouncementStatus = asyncHandler(async (req, res) => {
 
   announcement.isActive = !announcement.isActive;
   await announcement.save();
+  await deleteAnnouncementsCached()
 
   return res
     .status(200)
@@ -799,6 +827,8 @@ const createBanner = asyncHandler(async (req, res) => {
     image: imageUrl,
     createdBy: req.user.id,
   });
+
+  await deletedBannerCached()
 
   return res
     .status(201)
@@ -917,6 +947,7 @@ const updateBanner = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Redirect ID is required");
     }
     await banner.save();
+    await deletedBannerCached()
     return res
       .status(200)
       .json(new ApiResponse(200, "Banner updated successfully", banner));
@@ -929,6 +960,7 @@ const updateBanner = asyncHandler(async (req, res) => {
   const imageUrl = await uploadOnCloudinary(imageLocalPath);
   banner.image = imageUrl;
   await banner.save();
+  await deletedBannerCached()
   return res
     .status(200)
     .json(new ApiResponse(200, "Banner updated successfully", banner));
@@ -946,6 +978,7 @@ const updateBannerStatus = asyncHandler(async (req, res) => {
 
   banner.isActive = !banner.isActive;
   await banner.save();
+  await deletedBannerCached()
 
   return res
     .status(200)

@@ -5,6 +5,7 @@ import menuModel from "../models/menuItem.models.js";
 import restaurantModel from "../models/restaurant.models.js";
 import { verifyMenuOwnership } from "../utils/menuOwnership.utils.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
+import { setRestaurantMenuCached,getRestaurantMenuCached,deleteRestaurantMenuCached } from "../services/menuCahed.services.js";
 import mongoose from "mongoose";
 
 const createMenuItem = asyncHandler(async (req, res) => {
@@ -40,6 +41,8 @@ const createMenuItem = asyncHandler(async (req, res) => {
     foodType,
     image: imageUrl,
   });
+
+  await deleteRestaurantMenuCached(restaurantId)
   return res
     .status(201)
     .json(new ApiResponse(201, menuCreated, "Menu item created successfully"));
@@ -50,6 +53,17 @@ const getRestaurantMenu = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
     throw new ApiError(400, "Invalid restaurant ID");
   }
+  
+  const cachedData = await getRestaurantMenuCached(restaurantId)
+  if(cachedData){
+    
+    return res
+    .status(200)
+    .json(new ApiResponse(200, "Menu fetched successfuly", cachedData));
+  }
+
+  
+  
   const restaurant = await restaurantModel.findById(restaurantId);
   if (!restaurant) {
     throw new ApiError(404, "Restaurant not found");
@@ -59,6 +73,8 @@ const getRestaurantMenu = asyncHandler(async (req, res) => {
     restaurant: restaurantId,
     isDeleted: false,
   });
+
+  await setRestaurantMenuCached(restaurantId,menuItems)
 
   return res
     .status(200)
@@ -101,6 +117,10 @@ const updateMenuItem = asyncHandler(async (req, res) => {
     returnDocument: "after",
   });
 
+  await deleteRestaurantMenuCached(updatedMenu.restaurant)
+
+  
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Menu updated successfult", updatedMenu));
@@ -118,6 +138,8 @@ const updateMenuStatus = asyncHandler(async (req, res) => {
   menuItem.isAvailable = isAvailable;
   await menuItem.save();
 
+  await deleteRestaurantMenuCached(menuItem.restaurant._id)
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Availability updated successful", menuItem));
@@ -132,6 +154,7 @@ const deleteMenuItem = asyncHandler(async (req, res) => {
 
   menuItem.isDeleted = true;
   await menuItem.save();
+  await deleteRestaurantMenuCached(menuItem.restaurant._id)
   return res.status(200).json(new ApiResponse(200, "Menu deleted successfuly"));
 });
 

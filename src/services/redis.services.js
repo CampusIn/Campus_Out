@@ -14,7 +14,7 @@ const get = async (key) => {
   if (!value) return null;
 
   try {
-    JSON.parse(value);
+    return JSON.parse(value);
   } catch (err) {
     return value;
   }

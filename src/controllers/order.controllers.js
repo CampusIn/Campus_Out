@@ -11,6 +11,7 @@ import couponModel from "../models/coupon.models.js";
 import platformSettingsModel from "../models/platformSettings.models.js";
 import couponUsageModel from "../models/couponUsage.models.js";
 import menuModel from "../models/menuItem.models.js";
+import { platformSettingsCached,setPlatformSettingsCached,deletePlatformSettingsCached } from "../services/platformSettingsCached.services.js";
 
 const validateCartItems = (cartItems) => {
   cartItems.forEach((item) => {
@@ -444,12 +445,21 @@ const getVendorOrder = asyncHandler(async (req, res) => {
 });
 
 const getPlatformSettingsVendor = asyncHandler(async (req, res) => {
+  const cachedSettings = await platformSettingsCached()
+  if(cachedSettings){
+    return res
+    .status(200)
+    .json(new ApiResponse(200, "Order details fetched successfuly", cachedSettings));
+  }
+
+  
   const platformSettings = await platformSettingsModel
     .findOne()
     .select('-updatedAt -createdAt -__v')
   if (!platformSettings) {
     throw new ApiError(404, 'Platform settings not found')
   }
+  await setPlatformSettingsCached(platformSettings)
 
   return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
 });
@@ -681,12 +691,18 @@ const applyCoupon = asyncHandler(async (req, res) => {
 });
 
 const getPlatformSettingsUser = asyncHandler(async (req, res) => {
+  const cachedSettings = await platformSettingsCached()
+  if(cachedSettings){
+    return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', cachedSettings))
+  }
   const platformSettings = await platformSettingsModel
     .findOne()
     .select('-updatedAt -createdAt -__v')
   if (!platformSettings) {
     throw new ApiError(404, 'Platform settings not found')
   }
+
+  await setPlatformSettingsCached(platformSettings)
 
   return res.status(200).json(new ApiResponse(200, 'Platform settings fetched successfully', platformSettings))
 })

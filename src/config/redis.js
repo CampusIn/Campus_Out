@@ -1,10 +1,7 @@
 import Redis from "ioredis";
 import config from "../config/config.js"
 
-const redis = new Redis({
-    host:config.REDIS_HOST,
-    port: config.REDIS_PORT,
-    password: config.REDIS_PASSWORD,
+const redis = new Redis(config.REDIS_URL,{
     maxRetriesPerRequest: null,
     enableReadyCheck:true,
     lazyConnect:false

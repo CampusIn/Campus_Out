@@ -424,7 +424,7 @@ const verifyResetOtp = asyncHandler(async(req,res)=>{
     throw new ApiError(404,"Invalid OTP or email")
   }
 
-  const isVerified = await otpServices.verifyOTP(email,otp)
+  const isVerified = await otpServices.verifyOTP(normalisedEmail,otp)
   console.log(isVerified)
   if(!isVerified){
     throw new ApiError(400,"OTP verification failed")
