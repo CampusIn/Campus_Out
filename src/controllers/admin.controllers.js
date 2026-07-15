@@ -30,6 +30,9 @@ import {
 import { deletedBannerCached } from "../services/bannersCached.services.js";
 import { REDIS_KEYS } from "../constants/redis.constants.js";
 import { deleteAnnouncementsCached } from "../services/announcementsCached.services.js";
+import { deletedCategoriesCached } from "../services/categoriesCached.services.js";
+import { deleteRestaurantCached } from "../services/restaurantCached.services.js";
+import { deleteProductCached } from "../services/marketPlaceProductsCached.services.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -226,6 +229,8 @@ const suspendRestaurant = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Restaurant not found");
   }
 
+  await deleteRestaurantCached(restaurantId);
+
   return res.status(200).json(200, "Restuarant suspended successfully");
 });
 
@@ -243,6 +248,8 @@ const activateRestaurant = asyncHandler(async (req, res) => {
   if (!restaurant) {
     throw new ApiError(404, "Restaurant not found");
   }
+
+  await deleteRestaurantCached(restaurantId);
 
   return res
     .status(200)
@@ -1173,6 +1180,8 @@ const createCategory = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
+  await deletedCategoriesCached();
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Category created successfully", category));
@@ -1310,6 +1319,8 @@ const updateCategory = asyncHandler(async (req, res) => {
   }
 
   await category.save();
+  await deletedCategoriesCached();
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Category updated successfully", category));
@@ -1328,6 +1339,7 @@ const updateCategoryStatus = asyncHandler(async (req, res) => {
 
   category.isActive = !category.isActive;
   await category.save();
+  await deletedCategoriesCached();
 
   return res.status(200).json(
     new ApiResponse(200, "Category status updates successfully", {
@@ -1397,6 +1409,8 @@ const createProducts = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
     sellerPhoneNumber,
   });
+
+  await deleteProductCached(product._id)
 
   return res
     .status(201)
@@ -1593,6 +1607,7 @@ const updateProduct = asyncHandler(async(req,res)=>{
   }
 
   await product.save()
+  await deleteProductCached(productId)
 
   return res.status(200).json(new ApiResponse(200,'Product updated successfully',product))
 });
@@ -1608,6 +1623,7 @@ const updateProductStatus = asyncHandler(async(req,res)=>{
   }
   product.isActive = !product.isActive
   await product.save()
+  await deleteProductCached(productId)
 
   return res.status(200).json(new ApiResponse(200,'Product status updated successfully',product.isActive))
 })

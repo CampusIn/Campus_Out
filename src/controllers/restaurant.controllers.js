@@ -3,7 +3,13 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import mongoose from "mongoose";
-import { getRestaurantCached,setRestaurantCached,deleteRestaurantCached } from "../services/restaurantCahed.services.js";
+import {
+  getRestaurantCached,
+  setRestaurantCached,
+  getRestaurantsCached,
+  setRestaurantsCached,
+  deleteRestaurantCached,
+} from "../services/restaurantCached.services.js";
 
 const createRestaurant = asyncHandler(async (req, res) => {
   const { restaurantName, phone, description, location, category } = req.body;
@@ -19,6 +25,8 @@ const createRestaurant = asyncHandler(async (req, res) => {
   if (!newRestaurant) {
     throw new ApiError(500, "Failed to create restaurant");
   }
+
+  await deleteRestaurantCached();
 
   return res
     .status(201)
@@ -139,38 +147,60 @@ const updateRestaurantStatus = asyncHandler(async (req, res) => {
 
 const getAllRestaurantsByUser = asyncHandler(async (req, res) => {
   const { search, page = 1, limit = 10, category } = req.query;
+  const searchText = search ? String(search).trim() : "";
+  const categoryText = category ? String(category).trim() : "";
+  const pageNumber = parseInt(page) || 1;
+  const limitNumber = parseInt(limit) || 10;
+  if (pageNumber < 1 || limitNumber < 1) {
+    throw new ApiError(400, "Invalid page number or limit number");
+  }
+
+  const cacheParams = {
+    page: pageNumber,
+    limit: limitNumber,
+    search: searchText,
+    category: categoryText,
+  };
+  const cachedData = await getRestaurantsCached(cacheParams);
+  if (cachedData) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Restaurant fetched successfuly", cachedData));
+  }
+
   const filter = {
     isOpen: true,
   };
-  if (search) {
+  if (searchText) {
     filter.restaurantName = {
-      $regex: search,
+      $regex: searchText,
       $options: "i",
     };
   }
-  if (category) {
-    filter.category = category;
+  if (categoryText) {
+    filter.category = categoryText;
   }
 
-  const pageNumber = parseInt(page) || 1;
-  const limitNumber = parseInt(limit) || 10;
   const skip = (pageNumber - 1) * limitNumber;
-  const restaurant = await restaurantModel
-    .find(filter)
-    .skip(skip)
-    .limit(limitNumber);
-  const totalRestaurant = await restaurantModel.countDocuments(filter);
+  const [restaurant, totalRestaurant] = await Promise.all([
+    restaurantModel.find(filter).skip(skip).limit(limitNumber),
+    restaurantModel.countDocuments(filter),
+  ]);
   const totalPages = Math.ceil(totalRestaurant / limitNumber);
+  const responseData = {
+    restaurant,
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      totalPages,
+      totalRestaurant,
+    },
+  };
+
+  await setRestaurantsCached(cacheParams, responseData);
+
   return res.status(200).json(
-    new ApiResponse(200, "Restaurant fetched successfuly", {
-      restaurant,
-      pagination: {
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages,
-        totalRestaurant,
-      },
-    }),
+    new ApiResponse(200, "Restaurant fetched successfuly", responseData),
   );
 });
 

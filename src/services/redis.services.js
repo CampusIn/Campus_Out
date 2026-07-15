@@ -25,6 +25,13 @@ const remove = async(key)=>{
     await redis.del(key)
 }
 
+const removeByPattern = async(pattern)=>{
+    const keys = await redis.keys(pattern)
+    if(keys.length > 0){
+        await redis.del(...keys)
+    }
+}
+
 const exists = async(key)=>{
     return Boolean(await redis.exists(key))
 }
@@ -37,6 +44,7 @@ export default {
     get,
     set,
     remove,
+    removeByPattern,
     exists,
     expire
 }

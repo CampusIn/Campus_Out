@@ -8,9 +8,24 @@ export const REDIS_KEYS = {
     PLATFORM_SETTINGS:"paltform-settings",
     BANNERS:"banners",
     ANNOUNCEMENTS:"announcements",
+    MARKETPLACE_PRODUCTS_ID:function products(id){
+        return `market-place:products:${id}`
+    },
+    MARKETPLACE_PRODUCTS: function products(page, limit, search = "", category = "", condition = "", minPrice = "", maxPrice = "") {
+        return `market-place:products:page:${page}:limit:${limit}:search:${search || "all"}:category:${category || "all"}:condition:${condition || "all"}:minPrice:${minPrice || "all"}:maxPrice:${maxPrice || "all"}`
+    },
+    MARKETPLACE_PRODUCTS_PATTERN:"market-place:products:page:*",
+    CATEGORIES: function categories(page, limit, search = "") {
+        return `categories:page:${page}:limit:${limit}:search:${search || "all"}`
+    },
+    CATEGORIES_PATTERN:"categories:*",
     RESTAURANT_KEY: function restaurant(restaurantId){
         return `restaurant:${restaurantId}`
     },
+    RESTAURANTS: function restaurants(page, limit, search = "", category = "") {
+        return `restaurants:page:${page}:limit:${limit}:search:${search || "all"}:category:${category || "all"}`
+    },
+    RESTAURANTS_PATTERN:"restaurants:*",
 
     MENU_KEY: function restaurantMenu(restaurantId){
         return `restaurant:${restaurantId}:menu`
