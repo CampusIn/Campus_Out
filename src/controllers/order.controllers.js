@@ -12,6 +12,8 @@ import platformSettingsModel from "../models/platformSettings.models.js";
 import couponUsageModel from "../models/couponUsage.models.js";
 import menuModel from "../models/menuItem.models.js";
 import { platformSettingsCached,setPlatformSettingsCached,deletePlatformSettingsCached } from "../services/platformSettingsCached.services.js";
+import { getCouponCached, setCouponCached, deleteCouponCached } from "../services/couponCached.services.js";
+
 
 const validateCartItems = (cartItems) => {
   cartItems.forEach((item) => {
@@ -563,6 +565,13 @@ const changeOrderStatus = asyncHandler(async (req, res) => {
 //Coupon selection Module starts
 
 const getAllCoupons = asyncHandler(async (req, res) => {
+
+  const cachedData = await getCouponCached()
+  if(cachedData){
+    return res
+    .status(200)
+    .json(new ApiResponse(200, "Coupons fetched successfully", cachedData));
+  }
   const todayDate = new Date();
   const coupons = await couponModel
     .find({
@@ -582,6 +591,8 @@ const getAllCoupons = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, "No coupons to show", coupons));
   }
+
+  await setCouponCached(coupons)
 
   return res
     .status(200)

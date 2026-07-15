@@ -33,6 +33,7 @@ import { deleteAnnouncementsCached } from "../services/announcementsCached.servi
 import { deletedCategoriesCached } from "../services/categoriesCached.services.js";
 import { deleteRestaurantCached } from "../services/restaurantCached.services.js";
 import { deleteProductCached } from "../services/marketPlaceProductsCached.services.js";
+import { deleteCouponCached } from "../services/couponCached.services.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -455,6 +456,8 @@ const createCoupons = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
+  await deleteCouponCached()
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Coupon created successfully", coupon));
@@ -605,6 +608,7 @@ const updateCoupon = asyncHandler(async (req, res) => {
   }
 
   await coupon.save();
+  await deleteCouponCached()
 
   return res
     .status(200)
@@ -623,6 +627,7 @@ const updateCouponStatus = asyncHandler(async (req, res) => {
 
   coupon.isActive = !coupon.isActive;
   await coupon.save();
+  await deleteCouponCached()
 
   return res.status(200).json(
     new ApiResponse(200, "Coupon status updated successfully", {

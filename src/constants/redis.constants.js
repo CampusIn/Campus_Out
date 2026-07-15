@@ -8,6 +8,13 @@ export const REDIS_KEYS = {
     PLATFORM_SETTINGS:"paltform-settings",
     BANNERS:"banners",
     ANNOUNCEMENTS:"announcements",
+    REVIEW: function review(restaurantId, page, limit) {
+        return `reviews:restaurant:${restaurantId}:page:${page}:limit:${limit}`
+    },
+    REVIEW_PATTERN: function reviewPattern(restaurantId) {
+        return `reviews:restaurant:${restaurantId}:*`
+    },
+    COUPON:"coupon",
     MARKETPLACE_PRODUCTS_ID:function products(id){
         return `market-place:products:${id}`
     },

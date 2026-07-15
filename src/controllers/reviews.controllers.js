@@ -6,6 +6,12 @@ import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import updateRestaurantRating from "../utils/updateRestaurantReview.utils.js";
 import mongoose from "mongoose";
+import {
+  getReviewsCached,
+  setReviewsCached,
+  deleteReviewsCached,
+} from "../services/reviewCached.services.js";
+import { deleteRestaurantCached } from "../services/restaurantCached.services.js";
 
 const createReview = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
@@ -49,6 +55,8 @@ const createReview = asyncHandler(async (req, res) => {
   });
 
   await updateRestaurantRating(restaurantId);
+  await deleteReviewsCached(restaurantId);
+  await deleteRestaurantCached(restaurantId);
 
   return res
     .status(201)
@@ -74,55 +82,64 @@ const getAllReview = asyncHandler(async (req, res) => {
   if (pageNumber < 1 || limitNumber < 1) {
     throw new ApiError(404, "Invalid page number or limit number");
   }
+
+  const cacheParams = {
+    restaurantId,
+    page: pageNumber,
+    limit: limitNumber,
+  };
+  const cachedData = await getReviewsCached(cacheParams);
+  if (cachedData) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Reviews fetched successfuly", cachedData));
+  }
+
   const skip = (pageNumber - 1) * limitNumber;
 
-  const reviews = await reviewModel
-    .find({
+  const [reviews, totalReviews] = await Promise.all([
+    reviewModel
+      .find({
+        restaurant: restaurantId,
+      })
+      .populate({
+        path: "user",
+        select: "username -_id",
+      })
+      .sort({ createdAt: -1 })
+      .select({
+        __v: 0,
+        restaurant: 0,
+      })
+      .skip(skip)
+      .limit(limitNumber),
+    reviewModel.countDocuments({
       restaurant: restaurantId,
-    })
-    .populate({
-      path: "user",
-      select: "username -_id",
-    })
-    .sort({ createdAt: -1 })
-    .select({
-      __v: 0,
-      restaurant: 0,
-    })
-    .skip(skip)
-    .limit(limitNumber);
-  const totalReviews = await reviewModel.countDocuments({
-    restaurant: restaurantId,
-  });
+    }),
+  ]);
   const totalPages = Math.ceil(totalReviews / limitNumber);
+  const responseData = {
+    averageRating,
+    reviewCount,
+    reviews,
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      totalReviews,
+      totalPages,
+    },
+  };
+
+  await setReviewsCached(cacheParams, responseData);
+
   if (reviews.length === 0) {
     return res.status(200).json(
-      new ApiResponse(200, "No reviews", {
-        averageRating,
-        reviewCount,
-        reviews: [],
-        pagination: {
-          page: pageNumber,
-          limit: limitNumber,
-          totalReviews,
-          totalPages,
-        },
-      }),
+      new ApiResponse(200, "No reviews", responseData),
     );
   }
 
   return res.status(200).json(
-    new ApiResponse(200, "Reviews fetched successfuly", {
-      averageRating,
-      reviewCount,
-      reviews,
-      pagination: {
-        page: pageNumber,
-        limit: limitNumber,
-        totalReviews,
-        totalPages,
-      },
-    }),
+    new ApiResponse(200, "Reviews fetched successfuly", responseData),
   );
 });
 
@@ -150,6 +167,8 @@ const updateReview = asyncHandler(async (req, res) => {
   review.comment = comment;
   await review.save();
   await updateRestaurantRating(restaurantId);
+  await deleteReviewsCached(restaurantId);
+  await deleteRestaurantCached(restaurantId);
 
   return res
     .status(200)
@@ -174,6 +193,8 @@ const deleteReview = asyncHandler(async (req, res) => {
   const restaurantId = review.restaurant;
   await review.deleteOne();
   await updateRestaurantRating(restaurantId);
+  await deleteReviewsCached(restaurantId);
+  await deleteRestaurantCached(restaurantId);
 
   const restaurant = await restaurantModel.findById(restaurantId);
   const { averageRating, reviewCount } = restaurant;
