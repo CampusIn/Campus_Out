@@ -278,49 +278,135 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
 const updateCartItemQuantity = asyncHandler(async (req, res) => {
   const { menuItemId } = req.params;
   const { quantity } = req.body;
-  if (quantity < 1) {
+  const updateQuantity = Number(quantity);
+
+  if (!Number.isInteger(updateQuantity) || updateQuantity < 1) {
     throw new ApiError(400, "Inavlid quantity");
   }
   if (!mongoose.Types.ObjectId.isValid(menuItemId)) {
     throw new ApiError(400, "Menu Item Id is not valid");
   }
 
-  const cart = await cartModel.findOne({
-    user: req.user.id,
-  });
-  if (!cart) {
-    throw new ApiError(404, "Cart not found");
-  }
-
-  const item = cart.items.find((item) => {
-    if (item.menuItem.toString() === menuItemId) {
-      return item;
-    }
-  });
-
-  if (!item) {
-    throw new ApiError(404, "No such item in the cart");
-  }
-
-  const menu = await menuModel.findById(menuItemId);
+  const menu = await menuModel
+    .findById(menuItemId)
+    .select("restaurant name price stockQty isAvailable");
   if (!menu || !menu.isAvailable) {
     throw new ApiError(400, "Item currently unavailable");
   }
-  if (quantity > menu.stockQty) {
+  if (updateQuantity > menu.stockQty) {
     throw new ApiError(
       400,
       `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
     );
   }
 
-  item.quantity = quantity;
+  const updatedCart = await cartModel.findOneAndUpdate(
+    {
+      user: req.user.id,
+      restaurant: menu.restaurant,
+      "items.menuItem": menu._id,
+    },
+    [
+      {
+        $set: {
+          totalAmount: {
+            $let: {
+              vars: {
+                currentItem: {
+                  $first: {
+                    $filter: {
+                      input: "$items",
+                      as: "item",
+                      cond: { $eq: ["$$item.menuItem", menu._id] },
+                    },
+                  },
+                },
+              },
+              in: {
+                $add: [
+                  "$totalAmount",
+                  {
+                    $multiply: [
+                      {
+                        $subtract: [updateQuantity, "$$currentItem.quantity"],
+                      },
+                      menu.price,
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          items: {
+            $map: {
+              input: "$items",
+              as: "item",
+              in: {
+                $cond: [
+                  { $eq: ["$$item.menuItem", menu._id] },
+                  { $mergeObjects: ["$$item", { quantity: updateQuantity }] },
+                  "$$item",
+                ],
+              },
+            },
+          },
+        },
+      },
+    ],
+    {
+      returnDocument: 'after',
+      updatePipeline: true,
+      projection: {
+        items: 1,
+        totalAmount: 1,
+      },
+    },
+  );
 
-  const finalCart = await cartTotal(cart);
+  if (!updatedCart) {
+    const cart = await cartModel
+      .findOne({
+        user: req.user.id,
+      })
+      .select("restaurant items.menuItem")
+      .lean();
+
+    if (!cart) {
+      throw new ApiError(404, "Cart not found");
+    }
+
+    if (cart.restaurant.toString() !== menu.restaurant.toString()) {
+      throw new ApiError(
+        409,
+        "Items are from different restaurants.Remove the items for proceeding",
+      );
+    }
+
+    const item = cart.items.find(
+      (item) => item.menuItem.toString() === menu._id.toString(),
+    );
+
+    if (!item) {
+      throw new ApiError(404, "No such item in the cart");
+    }
+
+    throw new ApiError(409, "Cart was updated by another request");
+  }
+
+  if (updatedCart.totalAmount == null) {
+    const finalCart = await cartTotal(updatedCart);
+    return res.status(200).json(
+      new ApiResponse(200, "Quantity updated", {
+        items: finalCart.items,
+        totalAmount: finalCart.totalAmount,
+      }),
+    );
+  }
 
   return res.status(200).json(
     new ApiResponse(200, "Quantity updated", {
-      items: finalCart.items,
-      totalAmount: finalCart.totalAmount,
+      items: updatedCart.items,
+      totalAmount: updatedCart.totalAmount,
     }),
   );
 });

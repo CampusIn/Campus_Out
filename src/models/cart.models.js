@@ -41,7 +41,7 @@ const cartSchema = new mongoose.Schema(
   },
 );
 
-
+cartSchema.index({items:1})
 
 const cartModel = mongoose.model("Cart", cartSchema);
 
