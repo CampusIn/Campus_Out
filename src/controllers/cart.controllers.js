@@ -8,36 +8,64 @@ import mongoose from "mongoose";
 
 const addToCart = asyncHandler(async (req, res) => {
   const { menuItemId, quantity } = req.body;
+  const addQuantity = Number(quantity);
+
   if (!mongoose.Types.ObjectId.isValid(menuItemId)) {
     throw new ApiError(400, "Invalid menu item id");
   }
-  if (quantity < 1) {
+  if (!Number.isInteger(addQuantity) || addQuantity < 1) {
     throw new ApiError(400, "Invalid Quantity");
   }
 
-  const menu = await menuModel.findById(menuItemId);
+  const menu = await menuModel
+    .findById(menuItemId)
+    .select("restaurant name price stockQty isAvailable");
   if (!menu) {
     throw new ApiError(404, "Menu not found");
   }
   if (!menu.isAvailable) {
     throw new ApiError(400, "Item currently unavailable");
   }
-  if (quantity > menu.stockQty) {
+  if (addQuantity > menu.stockQty) {
     throw new ApiError(
       400,
       `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
     );
   }
 
+  const addedAmount = menu.price * addQuantity;
+  let createdCart = false;
   let cart = await cartModel.findOne({
     user: req.user.id,
   });
 
   if (!cart) {
-    cart = await cartModel.create({
-      user: req.user.id,
-      restaurant: menu.restaurant,
-    });
+    try {
+      cart = await cartModel.create({
+        user: req.user.id,
+        restaurant: menu.restaurant,
+        items: [
+          {
+            menuItem: menu._id,
+            quantity: addQuantity,
+          },
+        ],
+        totalAmount: addedAmount,
+      });
+      createdCart = true;
+    } catch (error) {
+      if (error.code !== 11000) {
+        throw error;
+      }
+
+      cart = await cartModel.findOne({
+        user: req.user.id,
+      });
+    }
+  }
+
+  if (!cart) {
+    throw new ApiError(409, "Cart was updated by another request");
   }
 
   if (cart.restaurant.toString() !== menu.restaurant.toString()) {
@@ -47,30 +75,130 @@ const addToCart = asyncHandler(async (req, res) => {
     );
   }
 
-  const existingItem = cart.items.find((item) => {
-    return item.menuItem.toString() === menuItemId.toString();
-  });
-
-  if (existingItem) {
-    if (existingItem.quantity + quantity > menu.stockQty) {
-      throw new ApiError(
-        400,
-        `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
-      );
-    }
-    existingItem.quantity += quantity;
-  } else {
-    cart.items.push({
-      menuItem: menuItemId,
-      quantity,
+  if (!createdCart) {
+    const existingItem = cart.items.find((item) => {
+      return item.menuItem.toString() === menu._id.toString();
     });
+
+    if (existingItem) {
+      const maxCurrentQuantity = menu.stockQty - addQuantity;
+      const updatedCart = await cartModel.findOneAndUpdate(
+        {
+          user: req.user.id,
+          restaurant: menu.restaurant,
+          items: {
+            $elemMatch: {
+              menuItem: menu._id,
+              quantity: { $lte: maxCurrentQuantity },
+            },
+          },
+        },
+        {
+          $inc: {
+            "items.$.quantity": addQuantity,
+            totalAmount: addedAmount,
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedCart) {
+        throw new ApiError(
+          400,
+          `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+        );
+      }
+
+      cart = updatedCart;
+    } else {
+      const updatedCart = await cartModel.findOneAndUpdate(
+        {
+          user: req.user.id,
+          restaurant: menu.restaurant,
+          items: {
+            $not: {
+              $elemMatch: { menuItem: menu._id },
+            },
+          },
+        },
+        {
+          $push: {
+            items: {
+              menuItem: menu._id,
+              quantity: addQuantity,
+            },
+          },
+          $inc: {
+            totalAmount: addedAmount,
+          },
+        },
+        { new: true },
+      );
+
+      if (!updatedCart) {
+        const latestCart = await cartModel.findOne({
+          user: req.user.id,
+        });
+        const latestItem = latestCart?.items.find(
+          (item) => item.menuItem.toString() === menu._id.toString(),
+        );
+
+        if (latestItem && latestItem.quantity + addQuantity > menu.stockQty) {
+          throw new ApiError(
+            400,
+            `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+          );
+        }
+
+        if (latestItem) {
+          const maxCurrentQuantity = menu.stockQty - addQuantity;
+          const retriedCart = await cartModel.findOneAndUpdate(
+            {
+              user: req.user.id,
+              restaurant: menu.restaurant,
+              items: {
+                $elemMatch: {
+                  menuItem: menu._id,
+                  quantity: { $lte: maxCurrentQuantity },
+                },
+              },
+            },
+            {
+              $inc: {
+                "items.$.quantity": addQuantity,
+                totalAmount: addedAmount,
+              },
+            },
+            { new: true },
+          );
+
+          if (!retriedCart) {
+            throw new ApiError(
+              400,
+              `Only ${menu.stockQty} item(s) of ${menu.name} are currently available`,
+            );
+          }
+
+          cart = retriedCart;
+        } else {
+          throw new ApiError(409, "Cart was updated by another request");
+        }
+      } else {
+        cart = updatedCart;
+      }
+    }
   }
 
-  const finalCart = await cartTotal(cart);
+  if (cart.totalAmount == null) {
+    const finalCart = await cartTotal(cart);
+    return res
+      .status(201)
+      .json(new ApiResponse(201, "Items added to cart", finalCart));
+  }
 
   return res
     .status(201)
-    .json(new ApiResponse(201, "Items added to cart", finalCart));
+    .json(new ApiResponse(201, "Items added to cart", cart));
 });
 
 const getItemsFromCart = asyncHandler(async (req, res) => {
