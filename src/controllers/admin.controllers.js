@@ -24,7 +24,7 @@ import config from "../config/config.js";
 import {
   platformSettingsCached,
   setPlatformSettingsCached,
-  deletePlatformSettingsCached
+  deletePlatformSettingsCached,
 } from "../services/platformSettingsCached.services.js";
 
 import { deletedBannerCached } from "../services/bannersCached.services.js";
@@ -34,6 +34,14 @@ import { deletedCategoriesCached } from "../services/categoriesCached.services.j
 import { deleteRestaurantCached } from "../services/restaurantCached.services.js";
 import { deleteProductCached } from "../services/marketPlaceProductsCached.services.js";
 import { deleteCouponCached } from "../services/couponCached.services.js";
+import {
+  getMarketplaceOverviewPipeline,
+  getMarketplaceOrderStatusPipeline,
+  getMarketplaceRevenueChartPipeline,
+  getTopMarketplaceProductsPipeline,
+  getTopMarketplaceCategoriesPipeline,
+  getMarketplaceInventoryPipeline,
+} from "../utils/marketPlaceAnalytics.utils.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -369,7 +377,7 @@ const editSettings = asyncHandler(async (req, res) => {
 
   settings.updatedBy = req.user.id;
   await settings.save();
-  await deletePlatformSettingsCached()
+  await deletePlatformSettingsCached();
 
   return res
     .status(200)
@@ -377,17 +385,17 @@ const editSettings = asyncHandler(async (req, res) => {
 });
 
 const getPlatformSettingsAdmin = asyncHandler(async (req, res) => {
-  const cachedSettings = await platformSettingsCached()
-  if(cachedSettings){
+  const cachedSettings = await platformSettingsCached();
+  if (cachedSettings) {
     return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        "Platform settings fetched successfully",
-        cachedSettings,
-      ),
-    );
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          "Platform settings fetched successfully",
+          cachedSettings,
+        ),
+      );
   }
   const platformSettings = await platformSettingsModel
     .findOne()
@@ -395,8 +403,7 @@ const getPlatformSettingsAdmin = asyncHandler(async (req, res) => {
   if (!platformSettings) {
     throw new ApiError(404, "Platform settings not found");
   }
-  await setPlatformSettingsCached(platformSettings)
-
+  await setPlatformSettingsCached(platformSettings);
 
   return res
     .status(200)
@@ -456,7 +463,7 @@ const createCoupons = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
-  await deleteCouponCached()
+  await deleteCouponCached();
 
   return res
     .status(201)
@@ -608,7 +615,7 @@ const updateCoupon = asyncHandler(async (req, res) => {
   }
 
   await coupon.save();
-  await deleteCouponCached()
+  await deleteCouponCached();
 
   return res
     .status(200)
@@ -627,7 +634,7 @@ const updateCouponStatus = asyncHandler(async (req, res) => {
 
   coupon.isActive = !coupon.isActive;
   await coupon.save();
-  await deleteCouponCached()
+  await deleteCouponCached();
 
   return res.status(200).json(
     new ApiResponse(200, "Coupon status updated successfully", {
@@ -655,7 +662,7 @@ const createAnnouncements = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
-  await deleteAnnouncementsCached()
+  await deleteAnnouncementsCached();
 
   return res
     .status(201)
@@ -782,7 +789,7 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
   }
 
   await announcement.save();
-  await deleteAnnouncementsCached()
+  await deleteAnnouncementsCached();
 
   return res
     .status(200)
@@ -804,7 +811,7 @@ const updateAnnouncementStatus = asyncHandler(async (req, res) => {
 
   announcement.isActive = !announcement.isActive;
   await announcement.save();
-  await deleteAnnouncementsCached()
+  await deleteAnnouncementsCached();
 
   return res
     .status(200)
@@ -840,7 +847,7 @@ const createBanner = asyncHandler(async (req, res) => {
     createdBy: req.user.id,
   });
 
-  await deletedBannerCached()
+  await deletedBannerCached();
 
   return res
     .status(201)
@@ -959,7 +966,7 @@ const updateBanner = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Redirect ID is required");
     }
     await banner.save();
-    await deletedBannerCached()
+    await deletedBannerCached();
     return res
       .status(200)
       .json(new ApiResponse(200, "Banner updated successfully", banner));
@@ -972,7 +979,7 @@ const updateBanner = asyncHandler(async (req, res) => {
   const imageUrl = await uploadOnCloudinary(imageLocalPath);
   banner.image = imageUrl;
   await banner.save();
-  await deletedBannerCached()
+  await deletedBannerCached();
   return res
     .status(200)
     .json(new ApiResponse(200, "Banner updated successfully", banner));
@@ -990,7 +997,7 @@ const updateBannerStatus = asyncHandler(async (req, res) => {
 
   banner.isActive = !banner.isActive;
   await banner.save();
-  await deletedBannerCached()
+  await deletedBannerCached();
 
   return res
     .status(200)
@@ -1158,6 +1165,64 @@ Team CAMPUSIN`,
 });
 
 //MarketPlace admin controlls starts here
+
+const getMarketPlaceDashboard = asyncHandler(async (req, res) => {
+  const [overviewCards, orderStatusChart, revenueChart] = await Promise.all([
+    getMarketplaceOverviewPipeline(),
+    getMarketplaceOrderStatusPipeline(),
+    getMarketplaceRevenueChartPipeline(),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(200, "Marketplace dashboard fetched successfully", {
+      overviewCards,
+      orderStatusChart,
+      revenueChart,
+    }),
+  );
+});
+
+const getTopMarketPlaceProducts = asyncHandler(async (req, res) => {
+  const topProducts = await getTopMarketplaceProductsPipeline();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Top marketplace products fetched successfully",
+        topProducts,
+      ),
+    );
+});
+
+const getTopMarketPlaceCategories = asyncHandler(async (req, res) => {
+  const topCategories = await getTopMarketplaceCategoriesPipeline();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Top marketplace categories fetched successfully",
+        topCategories,
+      ),
+    );
+});
+
+const getMarketPlaceInventory = asyncHandler(async (req, res) => {
+  const inventory = await getMarketplaceInventoryPipeline();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Marketplace inventory fetched successfully",
+        inventory,
+      ),
+    );
+});
 
 const createCategory = asyncHandler(async (req, res) => {
   const { name, description, priority } = req.body;
@@ -1415,7 +1480,7 @@ const createProducts = asyncHandler(async (req, res) => {
     sellerPhoneNumber,
   });
 
-  await deleteProductCached(product._id)
+  await deleteProductCached(product._id);
 
   return res
     .status(201)
@@ -1546,92 +1611,108 @@ const getProductById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Product fetchd successfully", product));
 });
 
-const updateProduct = asyncHandler(async(req,res)=>{
-  const{productId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(productId)){
-    throw new ApiError(400,'Product ID is invalid')
+const updateProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    throw new ApiError(400, "Product ID is invalid");
   }
 
-  const product = await marketPlaceProductsModel.findById(productId)
-  if(!product){
-    throw new ApiError(404,'Product not found')
+  const product = await marketPlaceProductsModel.findById(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found");
   }
 
-  const {categoryId} = req.body
-  const {name} = req.body
+  const { categoryId } = req.body;
+  const { name } = req.body;
 
-  if(categoryId){
-    if(!mongoose.Types.ObjectId.isValid(categoryId)){
-      throw new ApiError(400,'Category ID is invalid')
+  if (categoryId) {
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      throw new ApiError(400, "Category ID is invalid");
     }
     const category = await marketPlaceCategoryModel.findOne({
-      _id:categoryId,
-      isActive:true
-    })
-    if(!category){
-      throw new ApiError(404,'Category does not exists')
+      _id: categoryId,
+      isActive: true,
+    });
+    if (!category) {
+      throw new ApiError(404, "Category does not exists");
     }
-    product.category = categoryId
+    product.category = categoryId;
   }
 
-  if(name){
+  if (name) {
     const categoryToCheck = categoryId || product.category;
-    const normalisedName = name.trim().toUpperCase()
+    const normalisedName = name.trim().toUpperCase();
     const isDuplicateProduct = await marketPlaceProductsModel.findOne({
-      category:categoryToCheck,
-      name:normalisedName,
-      _id:{$ne:productId}
-    })
-    if(isDuplicateProduct){
-      throw new ApiError(409,'Similar product exists')
+      category: categoryToCheck,
+      name: normalisedName,
+      _id: { $ne: productId },
+    });
+    if (isDuplicateProduct) {
+      throw new ApiError(409, "Similar product exists");
     }
 
-    product.name = normalisedName
+    product.name = normalisedName;
   }
 
-  const allowedTypes = ["description","price","stock","condition","sellerPhoneNumber"]
-  allowedTypes.forEach((field)=>{
-    if(req.body[field] !== undefined){
-    product[field] = req.body[field]
+  const allowedTypes = [
+    "description",
+    "price",
+    "stock",
+    "condition",
+    "sellerPhoneNumber",
+  ];
+  allowedTypes.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      product[field] = req.body[field];
     }
-  })
+  });
 
-  if(req.files && req.files.length>0){
+  if (req.files && req.files.length > 0) {
     try {
-      const imageLocalPathArray = req.files
+      const imageLocalPathArray = req.files;
       let images = await Promise.all(
-        imageLocalPathArray.map((file)=>{
-           return uploadOnCloudinary(file.path)
-        })
-      )
+        imageLocalPathArray.map((file) => {
+          return uploadOnCloudinary(file.path);
+        }),
+      );
 
-      product.images = images
+      product.images = images;
     } catch (error) {
-      throw new ApiError(500,'Failed to upload image')
+      throw new ApiError(500, "Failed to upload image");
     }
   }
 
-  await product.save()
-  await deleteProductCached(productId)
+  await product.save();
+  await deleteProductCached(productId);
 
-  return res.status(200).json(new ApiResponse(200,'Product updated successfully',product))
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Product updated successfully", product));
 });
 
-const updateProductStatus = asyncHandler(async(req,res)=>{
-  const{productId} = req.params
-  if(!mongoose.Types.ObjectId.isValid(productId)){
-    throw new ApiError(400,'Product ID is invalid')
+const updateProductStatus = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    throw new ApiError(400, "Product ID is invalid");
   }
-  const product = await marketPlaceProductsModel.findById(productId)
-  if(!product){
-    throw new ApiError(404,'Product not found')
+  const product = await marketPlaceProductsModel.findById(productId);
+  if (!product) {
+    throw new ApiError(404, "Product not found");
   }
-  product.isActive = !product.isActive
-  await product.save()
-  await deleteProductCached(productId)
+  product.isActive = !product.isActive;
+  await product.save();
+  await deleteProductCached(productId);
 
-  return res.status(200).json(new ApiResponse(200,'Product status updated successfully',product.isActive))
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Product status updated successfully",
+        product.isActive,
+      ),
+    );
+});
 
 const restoreMarketOrderStock = async (orderItems, session) => {
   for (const item of orderItems) {
@@ -1650,7 +1731,7 @@ const restoreMarketOrderStock = async (orderItems, session) => {
 };
 
 const getAllMarketPlaceOrdersAdmin = asyncHandler(async (req, res) => {
-  const {status, page = 1, limit = 5 } = req.query;
+  const { status, page = 1, limit = 5 } = req.query;
   const pageNumber = parseInt(page) || 1;
   const limitNumber = parseInt(limit) || 5;
   if (pageNumber < 1 || limitNumber < 1) {
@@ -1680,7 +1761,9 @@ const getAllMarketPlaceOrdersAdmin = asyncHandler(async (req, res) => {
   const [orders, totalOrders] = await Promise.all([
     marketPlaceOrderModel
       .find(filter)
-      .select("user orderNumber categoryName pricing.finalAmount paymentMethod paymentStatus orderStatus customerPhone deliveryPartner createdAt rejectionMsg")
+      .select(
+        "user orderNumber categoryName pricing.finalAmount paymentMethod paymentStatus orderStatus customerPhone deliveryPartner createdAt rejectionMsg",
+      )
       .skip(skip)
       .limit(limitNumber)
       .populate([
@@ -1752,7 +1835,9 @@ const getMarketPlaceOrderByIdAdmin = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Marketplace order fetched successfully", { order }));
+    .json(
+      new ApiResponse(200, "Marketplace order fetched successfully", { order }),
+    );
 });
 
 const updateMarketPlaceOrderStatusAdmin = asyncHandler(async (req, res) => {
@@ -1783,10 +1868,16 @@ const updateMarketPlaceOrderStatusAdmin = asyncHandler(async (req, res) => {
   }
 
   if (["DELIVERED", "CANCELLED", "REJECTED"].includes(order.orderStatus)) {
-    throw new ApiError(409, "Order is in a final state, no more changes can be made");
+    throw new ApiError(
+      409,
+      "Order is in a final state, no more changes can be made",
+    );
   }
 
-  if (orderStatus === "REJECTED" && (!rejectionMsg || rejectionMsg.trim() === "")) {
+  if (
+    orderStatus === "REJECTED" &&
+    (!rejectionMsg || rejectionMsg.trim() === "")
+  ) {
     throw new ApiError(400, "Rejection message is required");
   }
 
@@ -1935,6 +2026,10 @@ export default {
   generateInvoiceFood,
   abandonCart,
   sendReminder,
+  getMarketPlaceDashboard,
+  getTopMarketPlaceProducts,
+  getTopMarketPlaceCategories,
+  getMarketPlaceInventory,
   createCategory,
   getAllCategories,
   getCategoryById,
@@ -1948,5 +2043,5 @@ export default {
   getAllMarketPlaceOrdersAdmin,
   getMarketPlaceOrderByIdAdmin,
   updateMarketPlaceOrderStatusAdmin,
-  assignMarketPlaceDeliveryPartnerAdmin
+  assignMarketPlaceDeliveryPartnerAdmin,
 };

@@ -11,7 +11,7 @@ import bannerUpdateValidationRules from "../validators/bannerUpdate.validators.j
 import marketPlaceCategoryValidationRules from "../validators/marketPlaceCategory.validators.js";
 import marketPlaceCategoryUpdateValidationRules from "../validators/marketPlaceCategoryUpdate.validators.js";
 import marketPlaceProductsValidationRules from "../validators/marketPlaceProducts.validators.js";
-import marketPlaceProductsUpdateValidationRules from "../validators/marketPlaceProductsUpdate.validators.js"
+import marketPlaceProductsUpdateValidationRules from "../validators/marketPlaceProductsUpdate.validators.js";
 import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
@@ -256,6 +256,34 @@ adminRouter.get(
 );
 
 adminRouter.get(
+  "/marketplace/dashboard",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getMarketPlaceDashboard,
+);
+
+adminRouter.get(
+  "/marketplace/dashboard/top-products",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getTopMarketPlaceProducts,
+);
+
+adminRouter.get(
+  "/marketplace/dashboard/top-categories",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getTopMarketPlaceCategories,
+);
+
+adminRouter.get(
+  "/marketplace/dashboard/inventory",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getMarketPlaceInventory,
+);
+
+adminRouter.get(
   "/marketplace/orders/:orderId",
   authMiddleware,
   roleMiddleware("admin"),
@@ -311,9 +339,9 @@ adminRouter.patch(
 adminRouter.patch(
   "/marketPlace/categories/:categoryId/status",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.updateCategoryStatus
-)
+  roleMiddleware("admin"),
+  adminController.updateCategoryStatus,
+);
 
 adminRouter.post(
   "/marketplace/products",
@@ -341,17 +369,17 @@ adminRouter.get(
 adminRouter.patch(
   "/marketplace/products/:productId",
   authMiddleware,
-  roleMiddleware('admin'),
-  upload.array('images',5),
+  roleMiddleware("admin"),
+  upload.array("images", 5),
   marketPlaceProductsUpdateValidationRules,
-  adminController.updateProduct
+  adminController.updateProduct,
 );
 
 adminRouter.patch(
   "/marketplace/products/:productId/status",
   authMiddleware,
-  roleMiddleware('admin'),
-  adminController.updateProductStatus
+  roleMiddleware("admin"),
+  adminController.updateProductStatus,
 );
 
 export default adminRouter;
