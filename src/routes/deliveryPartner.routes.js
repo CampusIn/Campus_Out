@@ -70,4 +70,11 @@ deliveryRouter.patch(
   deliveryControllers.updateOrderStatus
 )
 
+deliveryRouter.get(
+  "/view",
+  authMiddleware,
+  deliveryControllers.viewAllDeliveryPartners
+
+)
+
 export default deliveryRouter;

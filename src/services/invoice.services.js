@@ -17,14 +17,23 @@ const getInvoiceSummary = (order) => {
     return sum + item.quantity * item.priceAtPurchase;
   }, 0);
 
-  const subtotal = order.invoice?.subtotal ?? itemSubtotal;
-  const gstCharges = order.invoice?.gstCharges ?? order.gstAmount ?? 0;
+  const subtotal = order.pricing?.subTotal ?? order.invoice?.subtotal ?? itemSubtotal;
+  const gstCharges =
+    order.pricing?.gstAmount ?? order.invoice?.gstCharges ?? order.gstAmount ?? 0;
   const deliveryCharges =
-    order.invoice?.deliveryCharges ?? order.deliveryCharge ?? 0;
+    order.pricing?.deliveryCharge ??
+    order.invoice?.deliveryCharges ??
+    order.deliveryCharge ??
+    0;
   const packagingCharges =
-    order.invoice?.packagingCharges ?? order.packagingCharge ?? 0;
-  const discountAmount = order.discountAmount ?? 0;
-  const total = order.invoice?.total ?? order.totalAmount ?? subtotal;
+    order.pricing?.packagingCharge ??
+    order.invoice?.packagingCharges ??
+    order.packagingCharge ??
+    0;
+  const discountAmount =
+    order.pricing?.couponDiscount ?? order.discountAmount ?? 0;
+  const total =
+    order.pricing?.finalAmount ?? order.invoice?.total ?? order.totalAmount ?? subtotal;
 
   return {
     subtotal,

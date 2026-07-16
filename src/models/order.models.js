@@ -40,6 +40,49 @@ const cartSnapshotSchema = new mongoose.Schema(
   },
 );
 
+const pricingSnapShotSchema = new mongoose.Schema(
+  {
+    subTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    gstPercentage: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    gstAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    deliveryCharge: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    packagingCharge: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    couponDiscount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    finalAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -72,6 +115,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["PENDING", "PAID"],
       default: "PENDING",
     },
+    pricing: pricingSnapShotSchema,
     orderStatus: {
       type: String,
       enum: [

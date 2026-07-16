@@ -120,7 +120,7 @@ const createOrder = asyncHandler(async (req, res) => {
     const quantity = item.quantity;
     return { menuItem, itemName, priceAtPurchase, quantity };
   });
-  const totalAmount = orderItems.reduce((total, item) => {
+  const subTotal = orderItems.reduce((total, item) => {
     const itemPrice = item.priceAtPurchase * item.quantity;
     return total + itemPrice;
   }, 0);
@@ -129,7 +129,7 @@ const createOrder = asyncHandler(async (req, res) => {
   let couponDiscount = 0;
   let applied = false;
   let couponCode = null;
-  let pricingBase = totalAmount;
+  let pricingBase = subTotal;
 
   //If coupon is valid, then coupon discount is calculated
   if (couponId) {
@@ -160,7 +160,7 @@ const createOrder = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Coupon usage limit is over");
     }
 
-    if (totalAmount < coupon.minimumOrderValue) {
+    if (subTotal < coupon.minimumOrderValue) {
       throw new ApiError(
         400,
         "Total cart amount is lower than minimum order value for the coupon",
@@ -170,15 +170,15 @@ const createOrder = asyncHandler(async (req, res) => {
     let discount;
 
     if (coupon.discountType === "PERCENTAGE") {
-      discount = Math.round((totalAmount * coupon.discountValue) / 100);
+      discount = Math.round((subTotal * coupon.discountValue) / 100);
       if (discount > coupon.maximumDiscount) {
         discount = coupon.maximumDiscount;
       }
     } else if (coupon.discountType === "FIXED") {
       discount = coupon.discountValue;
     }
-    couponDiscount = Math.min(discount, totalAmount);
-    pricingBase = totalAmount - couponDiscount;
+    couponDiscount = Math.min(discount, subTotal);
+    pricingBase = subTotal - couponDiscount;
     applied = true;
     couponCode = coupon.code;
   }
@@ -215,6 +215,15 @@ const createOrder = asyncHandler(async (req, res) => {
           restaurantName,
           items: orderItems,
           totalAmount: finalAmount,
+          pricing: {
+            subTotal,
+            gstPercentage,
+            gstAmount,
+            deliveryCharge,
+            packagingCharge,
+            couponDiscount,
+            finalAmount,
+          },
           orderNumber: generateOrderNumber(),
           paymentMethod,
           coupon: couponId || undefined,
@@ -287,7 +296,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
   const orders = await orderModel
     .find(
       { user: req.user.id },
-      "orderNumber restaurantName totalAmount orderStatus createdAt rejectionMsg",
+      "orderNumber restaurantName totalAmount pricing orderStatus createdAt rejectionMsg",
     )
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -330,7 +339,7 @@ const getSingleOrder = asyncHandler(async (req, res) => {
   const order = await orderModel
     .findById(orderId)
     .select(
-      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt rejectionMsg")
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount pricing customerPhone deliveryAddress createdAt rejectionMsg")
     .populate({
       path: "items.menuItem",
       select: "image",
@@ -408,7 +417,9 @@ const getVendorOrder = asyncHandler(async (req, res) => {
   const totalPages = Math.ceil(totalOrders / limitNumber);
   const orders = await orderModel
     .find({ restaurant: restaurant._id })
-    .select("user items totalAmount orderNumber paymentMethod paymentStatus orderStatus createdAt customerPhone deliveryAddress discountAmount gstAmount packagingCharge deliveryCharge couponCode rejectionMsg")
+    .select(
+      "user items totalAmount pricing orderNumber paymentMethod paymentStatus orderStatus createdAt customerPhone deliveryAddress couponCode rejectionMsg",
+    )
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limitNumber)
@@ -476,7 +487,7 @@ const getSingleVendorOrder = asyncHandler(async (req, res) => {
   const order = await orderModel
     .findById(orderId)
     .select(
-      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount customerPhone deliveryAddress createdAt rejectionMsg")
+      "user restaurant orderNumber restaurantName items paymentMethod paymentStatus orderStatus totalAmount pricing customerPhone deliveryAddress createdAt rejectionMsg")
     .populate([
       {
       path: "items.menuItem",

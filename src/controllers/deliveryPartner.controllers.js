@@ -3,6 +3,7 @@ import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import deliveryPartnerModel from "../models/deliveryPartner.models.js";
 import orderModel from "../models/order.models.js";
+import userModel from "../models/user.models.js";
 import marketPlaceOrderModel from "../models/marketPlaceOrders.models.js";
 import mongoose from "mongoose";
 
@@ -338,6 +339,35 @@ const updateOrderStatus = asyncHandler(async(req,res)=>{
   return res.status(200).json(new ApiResponse(200,"Order status updated successfully"))
 })
 
+const viewAllDeliveryPartners = asyncHandler(async(req,res)=>{
+
+  const {role} = req.user
+  console.log(role)
+  const userId = req.user.id
+  const normalisedRole = role.trim().toLowerCase()
+
+  const user = await userModel.findById(userId)
+
+  if(!user){
+    throw new ApiError(400,"User not found")
+  }
+  if (!['admin', 'vendor'].includes(user.role)) {
+  throw new ApiError(403,"Unauthorised")
+}
+  const deliveryPartners = await deliveryPartnerModel.find({
+    isAvailable:true
+  }).populate({
+    path:"user",
+    select:"username"
+  })
+
+  if(!deliveryPartners || deliveryPartners.length === 0){
+    return res.status(200).json(new ApiResponse(200,"No delivery partners found"))
+  }
+
+  return res.status(200).json(new ApiResponse(200,"Delivery partners fetched successfully",deliveryPartners))
+})
+
 export default {
   createProfile,
   assignPartner,
@@ -347,5 +377,6 @@ export default {
   deliverOrder,
   viewAllMarketPlaceOrders,
   viewOrderById,
-  updateOrderStatus
+  updateOrderStatus,
+  viewAllDeliveryPartners
 };
