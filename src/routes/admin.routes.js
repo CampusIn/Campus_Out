@@ -235,6 +235,13 @@ adminRouter.get(
 );
 
 adminRouter.get(
+  "/marketplace/orders/:orderId/invoice",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.generateInvoiceMarketPlace,
+);
+
+adminRouter.get(
   "/abandoned-carts",
   authMiddleware,
   roleMiddleware("admin"),

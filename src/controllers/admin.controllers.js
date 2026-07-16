@@ -18,6 +18,7 @@ import deliveryPartnerModel from "../models/deliveryPartner.models.js";
 import { uploadOnCloudinary } from "../services/cloudinary.services.js";
 import topRestaurantsPipeline from "../utils/topRestaurant.utils.js";
 import generateInvoicePDF from "../services/invoice.services.js";
+import generateMarketPlaceInvoicePDF from "../services/marketPlaceInvoice.services.js";
 import { sendEmail } from "../services/email.services.js";
 import reminderHTML from "../utils/reminderHTML.utils.js";
 import config from "../config/config.js";
@@ -1054,6 +1055,32 @@ const generateInvoiceFood = asyncHandler(async (req, res) => {
   res.send(pdfBuffer);
 });
 
+const generateInvoiceMarketPlace = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new ApiError(400, "Invalid Order ID");
+  }
+
+  const order = await marketPlaceOrderModel.findById(orderId).populate([
+    {
+      path: "user",
+      select: "username email",
+    },
+  ]);
+
+  if (!order) {
+    throw new ApiError(404, "Marketplace order not found");
+  }
+
+  const pdfBuffer = await generateMarketPlaceInvoicePDF(order);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=marketplace-invoice-${order.orderNumber}.pdf`,
+  );
+  res.send(pdfBuffer);
+});
+
 const abandonCart = asyncHandler(async (req, res) => {
   const { page = 1, limit = 5 } = req.query;
   const pageNumber = parseInt(page) || 1;
@@ -2024,6 +2051,7 @@ export default {
   topRestaurants,
   getPlatformSettingsAdmin,
   generateInvoiceFood,
+  generateInvoiceMarketPlace,
   abandonCart,
   sendReminder,
   getMarketPlaceDashboard,
