@@ -43,6 +43,7 @@ import {
   getTopMarketplaceCategoriesPipeline,
   getMarketplaceInventoryPipeline,
 } from "../utils/marketPlaceAnalytics.utils.js";
+import repairPartnerModel from "../models/repairPartner.models.js";
 
 const viewAdminDashboard = asyncHandler(async (req, res) => {
   const [userCount, vendorCount, restaurantCount, orderCount, revenue] =
@@ -2020,6 +2021,96 @@ const assignMarketPlaceDeliveryPartnerAdmin = asyncHandler(async (req, res) => {
     );
 });
 
+//Repair Partner Module
+
+const createRepairPartner = asyncHandler(async(req,res)=>{
+  const {name,phoneNumber,specialisations} = req.body
+
+  const isExisting = await repairPartnerModel.findOne({
+    phoneNumber
+  })
+
+  if(isExisting){
+    throw new ApiError(409,"Similar user exists with the same mobile number")
+  }
+
+  const normalisedName = name.trim()
+  const repairPartner = await repairPartnerModel.create({
+    name:normalisedName,
+    phoneNumber,
+    specialisations
+  })
+
+  return res.status(201).json(new ApiResponse(201,"New repair partner created successfully",{
+    name:repairPartner.name,
+    phoneNumber:repairPartner.phoneNumber,
+    specialisations:repairPartner.specialisations,
+    isActive:repairPartner.isActive
+  }))
+});
+
+const getAllRepairPartner = asyncHandler(async(req,res)=>{
+  const repairPartners = await repairPartnerModel.find({
+    isActive:true
+  }).select("name phoneNumber specialisations isActive")
+  if(!repairPartners){
+    throw new ApiError(404,"Repair Partners not found")
+  }
+
+  return res.status(200).json(new ApiResponse(200,"Repair partners fetched successfully",repairPartners))
+});
+
+const getOneRepairPartner = asyncHandler(async(req,res)=>{
+  const {partnerId} = req.params
+  if(!mongoose.Types.ObjectId.isValid(partnerId)){
+    throw new ApiError(400,"Invalid Partner Id")
+  }
+
+  const repairPartner = await repairPartnerModel.findById(partnerId).select("name phoneNumber specialisations isActive")
+  if(!repairPartner){
+    throw new ApiError(404,"Repair partner not found ")
+  }
+
+  return res.status(200).json(new ApiResponse(200,"Reapir Partner fethced successfully",repairPartner))
+});
+
+const updateRepairPartner = asyncHandler(async(req,res)=>{
+  const{partnerId} = req.params
+  if(!partnerId){
+    throw new ApiError(400,"Partner Id not found")
+  }
+
+  const repairPartner = await repairPartnerModel.findById(partnerId)
+  if(!repairPartner){
+    throw new ApiError(404,"Repair partner not found")
+  }
+  const allowedFields = ["name","phoneNumber","specialisations"]
+
+  allowedFields.forEach((value)=>{
+    if(req.body[value]!==undefined){
+      repairPartner[value]=req.body[value]
+    }
+  })
+
+  await repairPartner.save()
+
+  return res.status(200).json(new ApiResponse(200,"Repair Partner updated successfully",repairPartner))
+
+});
+
+const updateRepairPartnerStatus = asyncHandler(async(req,res)=>{
+  const{partnerId} = req.params
+  const repairPartner = await repairPartnerModel.findById(partnerId)
+  if(!repairPartner){
+    throw new ApiError(404,"Repair partner not found")
+  }
+
+  repairPartner.isActive = !repairPartner.isActive
+  await repairPartner.save()
+
+  return res.status(200).json(new ApiResponse(200,"Repair Partner status upadted successfully",repairPartner.isActive))
+})
+
 export default {
   viewAdminDashboard,
   viewUsers,
@@ -2072,4 +2163,9 @@ export default {
   getMarketPlaceOrderByIdAdmin,
   updateMarketPlaceOrderStatusAdmin,
   assignMarketPlaceDeliveryPartnerAdmin,
+  createRepairPartner,
+  getAllRepairPartner,
+  getOneRepairPartner,
+  updateRepairPartner,
+  updateRepairPartnerStatus
 };

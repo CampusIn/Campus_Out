@@ -12,6 +12,8 @@ import marketPlaceCategoryValidationRules from "../validators/marketPlaceCategor
 import marketPlaceCategoryUpdateValidationRules from "../validators/marketPlaceCategoryUpdate.validators.js";
 import marketPlaceProductsValidationRules from "../validators/marketPlaceProducts.validators.js";
 import marketPlaceProductsUpdateValidationRules from "../validators/marketPlaceProductsUpdate.validators.js";
+import repairPartnerValidationRules from "../validators/repairPartner.validators.js";
+import updateRepairPartnerRules from "../validators/repairPartnerUpadation.validators.js";
 import upload from "../middlewares/multer.middlewares.js";
 
 const adminRouter = Router();
@@ -388,5 +390,42 @@ adminRouter.patch(
   roleMiddleware("admin"),
   adminController.updateProductStatus,
 );
+
+adminRouter.post(
+  "/repair-partners",
+  authMiddleware,
+  roleMiddleware('admin'),
+  repairPartnerValidationRules,
+  adminController.createRepairPartner
+);
+
+adminRouter.get(
+  "/repair-partners",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getAllRepairPartner
+);
+
+adminRouter.get(
+  "/repair-partners/:partnerId",
+  authMiddleware,
+  roleMiddleware("admin"),
+  adminController.getOneRepairPartner
+);
+
+adminRouter.patch(
+  "/repair-partners/:partnerId",
+  authMiddleware,
+  roleMiddleware('admin'),
+  updateRepairPartnerRules,
+  adminController.updateRepairPartner
+);
+
+adminRouter.patch(
+  "/repair-partners/:partnerId/status",
+  authMiddleware,
+  roleMiddleware('admin'),
+  adminController.updateRepairPartnerStatus
+)
 
 export default adminRouter;
