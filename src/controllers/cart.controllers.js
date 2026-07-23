@@ -216,7 +216,7 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         "No items in the cart",
-        (cart = {
+        ({
           restaurant: null,
           items: [],
           totalAmount: 0,
@@ -230,9 +230,7 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
     select: "name price image stockQty",
   });
 
-  cart.items = cart.items.filter((item) => {
-    if (item.menuItem) return item;
-  });
+  cart.items = cart.items.filter((item) => item.menuItem);
 
   const menuIdOnly = cart.items.map((item) => item.menuItem._id);
   const menus = await menuModel.find({
@@ -245,11 +243,12 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
     const menu = menus.find(
       (menu) => menu._id.toString() === item.menuItem._id.toString(),
     );
-    if (!menu)
+    if (!menu){
       throw new ApiError(
         400,
         "One or more items in your cart is not available",
       );
+    }
     if (!menu.isAvailable) {
       throw new ApiError(400, `${menu.name} is currently unavailable`);
     }

@@ -13,10 +13,10 @@ const verifyOTP = async(email,OTP)=>{
     const redisKey = otpKey(email)
     const hashedOTP = await redisServices.get(redisKey)
     if(!hashedOTP)
-        return false
+        {return false}
     const isVerified = await bcrypt.compare(OTP,hashedOTP)
     if(!isVerified)
-        return false
+        {return false}
 
     await redisServices.remove(redisKey)
     return true
