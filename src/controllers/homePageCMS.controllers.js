@@ -1,6 +1,5 @@
 import bannerModel from "../models/banners.models.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js"
 import announcementModel from "../models/anouncement.models.js";
 import { getBannerCached, setBannerCached } from "../services/bannersCached.services.js";

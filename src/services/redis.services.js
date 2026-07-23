@@ -11,7 +11,7 @@ const set = async (key, value, ttl = null) => {
 
 const get = async (key) => {
   const value = await redis.get(key);
-  if (!value) return null;
+  if (!value) {return null};
 
   try {
     return JSON.parse(value);

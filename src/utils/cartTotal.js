@@ -13,11 +13,11 @@ const cartTotal = async (cart) => {
     const menu = menus.find(
       (menu) => menu._id.toString() === item.menuItem.toString(),
     );
-    if (!menu)
+    if (!menu){
       throw new ApiError(
         400,
         "One or more items in your cart is not available",
-      );
+      );}
     if (!menu.isAvailable) {
       throw new ApiError(400, `${menu.name} is currently unavailable`);
     }

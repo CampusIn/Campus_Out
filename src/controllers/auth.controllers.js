@@ -8,7 +8,6 @@ import emailServices from "../services/emailQueue.services.js";
 import otpServices from "../services/otp.services.js";
 import redisServices from "../services/redis.services.js";
 import { generateOTP, generateOtpHTML, generateWelcomeHTML,generateForgotPasswordHTML } from "../utils/utils.js";
-import otpModel from "../models/otp.models.js";
 import ApiError from "../utils/apiErrors.js";
 import ApiResponse from "../utils/apiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
@@ -249,7 +248,7 @@ const logout = asyncHandler(async (req, res) => {
   await session.save();
   res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
 
-  res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
+  return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
 });
 
 const logoutAll = asyncHandler(async (req, res) => {
@@ -274,7 +273,7 @@ const logoutAll = asyncHandler(async (req, res) => {
   );
 
   res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
-  res.status(200).json(new ApiResponse(200, {}, "Logged out from all devices"));
+  return res.status(200).json(new ApiResponse(200, {}, "Logged out from all devices"));
 });
 
 const verifyEmail = asyncHandler(async (req, res) => {

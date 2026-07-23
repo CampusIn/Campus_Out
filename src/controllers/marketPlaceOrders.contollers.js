@@ -137,7 +137,9 @@ const calculateCouponDiscount = async (couponId, userId, subTotal) => {
 };
 
 const redeemCouponForMarketOrder = async (coupon, userId, orderId, session) => {
-  if (!coupon) return;
+  if (!coupon) {
+    return
+  }
 
   try {
     await couponUsageModel.create(

@@ -10,7 +10,9 @@ cloudinary.config({
 
 const uploadOnCloudinary = async (localFilePath) => {
   try {
-    if (!localFilePath) return "Local file path not detected";
+    if (!localFilePath) {
+      return "Local file path not detected";
+    }
     //File upload in cloundinary
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "image",
@@ -19,7 +21,7 @@ const uploadOnCloudinary = async (localFilePath) => {
     return response.url;
   } catch (error) {
     fs.unlinkSync(localFilePath); //removes the loacally saved file in the server if file upload to cloudinary fails
-    throw new Error("Cloudinary upload failed");
+    throw new Error(`Cloudinary upload failed ${error.message}`);
   }
 };
 

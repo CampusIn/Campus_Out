@@ -194,7 +194,9 @@ const createOrder = asyncHandler(async (req, res) => {
   const packagingCharge = platformSettings.packagingCharge;
   const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
 
-  if (freeDeliveryAbove <= pricingBase) deliveryCharge = 0;
+  if (freeDeliveryAbove <= pricingBase) {
+    deliveryCharge = 0;
+  }
 
   const finalAmount =
     pricingBase + gstAmount + deliveryCharge + packagingCharge;
@@ -685,7 +687,9 @@ const applyCoupon = asyncHandler(async (req, res) => {
   const packagingCharge = platformSettings.packagingCharge;
   const freeDeliveryAbove = platformSettings.freeDeliveryAbove;
 
-  if (freeDeliveryAbove <= subTotalAfterDiscount) deliveryCharge = 0;
+  if (freeDeliveryAbove <= subTotalAfterDiscount) {
+    deliveryCharge = 0
+  }
 
   const finalAmount =
     subTotalAfterDiscount + gstAmount + deliveryCharge + packagingCharge;

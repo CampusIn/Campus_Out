@@ -605,13 +605,13 @@ const updateCoupon = asyncHandler(async (req, res) => {
 
   if (coupon.discountType === "PERCENTAGE") {
     if (coupon.discountValue > 100)
-      throw new ApiError(400, "Discount value cannot be greater than 100");
+      {throw new ApiError(400, "Discount value cannot be greater than 100");}
 
     if (coupon.maximumDiscount < 1)
-      throw new ApiError(
+      {throw new ApiError(
         400,
         "Maximum discount anount should be greater than 0",
-      );
+      );}
   } else if (coupon.discountType === "FIXED") {
     coupon.maximumDiscount = 0;
   }
@@ -690,9 +690,12 @@ const getAnnouncements = asyncHandler(async (req, res) => {
     };
   }
 
-  if (isActive === "true") filter.isActive = true;
-  else if (isActive === "false") filter.isActive = false;
-
+  if (isActive === "true") {
+    filter.isActive = true
+  }
+  else if (isActive === "false") {
+    filter.isActive = false
+  }
   const [announcements, totalAnnouncements] = await Promise.all([
     announcementModel
       .find(filter)
@@ -775,7 +778,9 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
 
   const updates = req.body;
   Object.entries(updates).forEach(([key, value]) => {
-    if (value !== undefined) announcement[key] = value;
+    if (value !== undefined) {
+      announcement[key] = value;
+    }
   });
 
   if (updates.expiresAt) {
@@ -786,8 +791,9 @@ const updateAnnouncement = asyncHandler(async (req, res) => {
   }
 
   if (updates.priority !== undefined) {
-    if (updates.priority < 1)
+    if (updates.priority < 1){
       throw new ApiError(400, "Priority cannot be less than 1");
+    }
   }
 
   await announcement.save();

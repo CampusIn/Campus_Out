@@ -16,7 +16,11 @@
     "worker": "nodemon src/workers/email.workers.js",
     "start": "node server.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage"
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@bull-board/api": "^8.1.2",
@@ -42,6 +46,9 @@
     "prettier": "^3.9.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "jest": "^30.4.2",
     "mongodb-memory-server": "^11.2.0",
     "supertest": "^7.2.2"

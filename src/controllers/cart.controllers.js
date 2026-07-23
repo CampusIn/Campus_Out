@@ -231,7 +231,9 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
   });
 
   cart.items = cart.items.filter((item) => {
-    if (item.menuItem) return item;
+    if (item.menuItem) {
+      return item;
+    }
   });
 
   const menuIdOnly = cart.items.map((item) => item.menuItem._id);
@@ -245,11 +247,12 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
     const menu = menus.find(
       (menu) => menu._id.toString() === item.menuItem._id.toString(),
     );
-    if (!menu)
+    if (!menu){
       throw new ApiError(
         400,
         "One or more items in your cart is not available",
       );
+    }
     if (!menu.isAvailable) {
       throw new ApiError(400, `${menu.name} is currently unavailable`);
     }
