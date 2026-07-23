@@ -27,15 +27,29 @@ const clearRefreshTokenCookieOptions = {
   sameSite: refreshTokenCookieOptions.sameSite,
 };
 
+const getExpectedRole = (req) => req.authRole;
+
+const ensureExpectedRole = (expectedRole, actualRole) => {
+  if (expectedRole && expectedRole !== actualRole) {
+    throw new ApiError(
+      403,
+      `This endpoint is only available for ${expectedRole} accounts`,
+    );
+  }
+};
+
 const register = asyncHandler(async (req, res) => {
-  const { username, email, password, role } = req.body;
+  const { username, email, password } = req.body;
+  const role = getExpectedRole(req) || "user";
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedUsername = username?.trim();
 
   if (!username || !email || !password) {
     throw new ApiError(400, "Username, email and password are required");
   }
 
   const isUserExists = await userModel.findOne({
-    $or: [{ email }, { username }],
+    $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
   });
   if (isUserExists) {
     throw new ApiError(409, "Username or email already exists");
@@ -43,19 +57,18 @@ const register = asyncHandler(async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const newUser = await userModel.create({
-    username,
-    email,
+    username: normalizedUsername,
+    email: normalizedEmail,
     password: hashedPassword,
     role,
   });
 
   const otp = generateOTP();
   const otpHTML = generateOtpHTML(otp);
-  const otpHash = await bcrypt.hash(otp, 10);
-  await otpServices.storeOTP(email, otp);
+  await otpServices.storeOTP(normalizedEmail, otp);
 
   await emailServices.queueOTPEmail({
-    to: email,
+    to: normalizedEmail,
     subject: "Your OTP for CampusIn registration",
     text: "OTP for CampusIn registration. Only valid for 5 minutes",
     otpHtml: otpHTML,
@@ -66,8 +79,8 @@ const register = asyncHandler(async (req, res) => {
       201,
       "User registered successfully. Please verify your email",
       {
-        username,
-        email,
+        username: normalizedUsername,
+        email: normalizedEmail,
         verified: newUser.verified,
       },
     ),
@@ -76,12 +89,17 @@ const register = asyncHandler(async (req, res) => {
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const expectedRole = getExpectedRole(req);
+  const normalizedEmail = email?.trim().toLowerCase();
 
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
   }
 
-  const user = await userModel.findOne({ email });
+  const user = await userModel.findOne({
+    email: normalizedEmail,
+    ...(expectedRole ? { role: expectedRole } : {}),
+  });
   if (!user) {
     throw new ApiError(400, "Invalid credentials");
   }
@@ -144,6 +162,7 @@ const login = asyncHandler(async (req, res) => {
 
 const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.cookies;
+  const expectedRole = getExpectedRole(req);
   if (!refreshToken) {
     throw new ApiError(401, "Unauthorised, refresh token not found");
   }
@@ -160,6 +179,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(401, "User not found");
   }
+  ensureExpectedRole(expectedRole, user.role);
 
   if (!session) {
     throw new ApiError(400, "No session in progress");
@@ -205,10 +225,14 @@ const refreshToken = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   const { refreshToken } = req.cookies;
+  const expectedRole = getExpectedRole(req);
   if (!refreshToken) {
     res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
     return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
   }
+
+  const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
+  ensureExpectedRole(expectedRole, decoded.role);
 
   const refreshTokenHash = await crypto
     .createHash("sha256")
@@ -230,6 +254,7 @@ const logout = asyncHandler(async (req, res) => {
 
 const logoutAll = asyncHandler(async (req, res) => {
   const { refreshToken } = req.cookies;
+  const expectedRole = getExpectedRole(req);
   if (!refreshToken) {
     res.clearCookie("refreshToken", clearRefreshTokenCookieOptions);
     return res
@@ -237,6 +262,7 @@ const logoutAll = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, {}, "Logged out from all devices"));
   }
   const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
+  ensureExpectedRole(expectedRole, decoded.role);
   await sessionModel.updateMany(
     {
       user: decoded.id,
@@ -253,18 +279,23 @@ const logoutAll = asyncHandler(async (req, res) => {
 
 const verifyEmail = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
+  const expectedRole = getExpectedRole(req);
+  const normalizedEmail = email?.trim().toLowerCase();
 
   if (!email || !otp) {
     throw new ApiError(400, "Email and OTP are required");
   }
 
-  const verifyOTP = await otpServices.verifyOTP(email,otp)
+  const verifyOTP = await otpServices.verifyOTP(normalizedEmail, otp)
   if(!verifyOTP){
     throw new ApiError(400,"OTP verification failed")
   }
 
   const user = await userModel.findOneAndUpdate(
-    { email },
+    {
+      email: normalizedEmail,
+      ...(expectedRole ? { role: expectedRole } : {}),
+    },
     { verified: true },
     { returnDocument: "after" },
   );
@@ -304,7 +335,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
   );
 
   await emailServices.queueWelcomeEmail({
-    to: email,
+    to: normalizedEmail,
     subject: "Welcome to CAMPUSIN",
     text: "Welcome to CAMPUSIN. Your account is verified and ready to use.",
     welcomeHtml: generateWelcomeHTML(),
@@ -327,12 +358,15 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
 const resendOTP = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  const expectedRole = getExpectedRole(req);
+  const normalizedEmail = email?.trim().toLowerCase();
   if (!email) {
     throw new ApiError(400, "Email is required");
   }
 
   const user = await userModel.findOne({
-    email,
+    email: normalizedEmail,
+    ...(expectedRole ? { role: expectedRole } : {}),
   });
 
   if (!user) {
@@ -351,22 +385,22 @@ const resendOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is already verified");
   }
 
-  const isCooldown = await redisServices.exists(`${REDIS_KEYS.COOLDOWN_KEY}:${email}`)
+  const isCooldown = await redisServices.exists(`${REDIS_KEYS.COOLDOWN_KEY}:${normalizedEmail}`)
 
   if(isCooldown){
     throw new ApiError(429, "Please wait 60 seconds before requesting a new OTP");
   }
 
-  await redisServices.set(`${REDIS_KEYS.COOLDOWN_KEY}:${email}`,'1',60)
+  await redisServices.set(`${REDIS_KEYS.COOLDOWN_KEY}:${normalizedEmail}`,'1',60)
 
 
 
   const otp = generateOTP();
   const otpHTML = generateOtpHTML(otp);
-  await otpServices.storeOTP(email,otp)
+  await otpServices.storeOTP(normalizedEmail,otp)
 
   await emailServices.queueOTPEmail({
-    to:email,
+    to:normalizedEmail,
     subject:"Hey, didn't you verify your email yet? Here's your OTP",
     text:"Please use the following OTP to verify your email:",
     otpHtml:otpHTML
@@ -378,13 +412,15 @@ const resendOTP = asyncHandler(async (req, res) => {
 
 const forgotPassword = asyncHandler(async(req,res)=>{
   const {email} = req.body
+  const expectedRole = getExpectedRole(req);
   if(!email){
     throw new ApiError(400,"User email is required")
   }
   const normalisedEmail = email.trim().toLowerCase()
   const user = await userModel.findOne({
     email:normalisedEmail,
-    verified:true
+    verified:true,
+    ...(expectedRole ? { role: expectedRole } : {}),
   })
 
   if(!user){
@@ -407,7 +443,7 @@ const forgotPassword = asyncHandler(async(req,res)=>{
 
 const verifyResetOtp = asyncHandler(async(req,res)=>{
   const {email,otp} = req.body
-  console.log(typeof otp)
+  const expectedRole = getExpectedRole(req);
   if(!otp){
     throw new ApiError(400,"OTP is missing")
   }
@@ -418,14 +454,14 @@ const verifyResetOtp = asyncHandler(async(req,res)=>{
 
   const user = await userModel.findOne({
     email:normalisedEmail,
-    verified:true
+    verified:true,
+    ...(expectedRole ? { role: expectedRole } : {}),
   })
   if(!user){
     throw new ApiError(404,"Invalid OTP or email")
   }
 
   const isVerified = await otpServices.verifyOTP(normalisedEmail,otp)
-  console.log(isVerified)
   if(!isVerified){
     throw new ApiError(400,"OTP verification failed")
   }

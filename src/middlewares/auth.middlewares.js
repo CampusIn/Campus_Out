@@ -36,4 +36,9 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { authMiddleware };
+const setAuthRole = (role) => (req, res, next) => {
+  req.authRole = role;
+  next();
+};
+
+export { authMiddleware, setAuthRole };

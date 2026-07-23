@@ -99,7 +99,7 @@ const addToCart = asyncHandler(async (req, res) => {
             totalAmount: addedAmount,
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
 
       if (!updatedCart) {
@@ -132,7 +132,7 @@ const addToCart = asyncHandler(async (req, res) => {
             totalAmount: addedAmount,
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
 
       if (!updatedCart) {
@@ -169,7 +169,7 @@ const addToCart = asyncHandler(async (req, res) => {
                 totalAmount: addedAmount,
               },
             },
-            { new: true },
+            { returnDocument: 'after' },
           );
 
           if (!retriedCart) {
