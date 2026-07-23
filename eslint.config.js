@@ -22,7 +22,7 @@ export default [
       "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
       "no-undef": "error",
       "prefer-const": "warn",
-      "eqeqeq": ["error", "always"],
+      "eqeqeq": ["error", "always",{"null":"ignore"}],
       "no-console": ["warn", { allow: ["warn", "error", "info"] }],
       "consistent-return": "error",
       "curly": ["error", "all"],

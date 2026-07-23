@@ -1493,7 +1493,7 @@ const createProducts = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Similar product exists");
   }
 
-  let images = [];
+  let images;
   try {
     images = await Promise.all(
       imageLocalPath.map((file) => uploadOnCloudinary(file.path)),

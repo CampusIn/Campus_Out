@@ -216,7 +216,7 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         "No items in the cart",
-        (cart = {
+        ({
           restaurant: null,
           items: [],
           totalAmount: 0,
@@ -230,11 +230,7 @@ const getItemsFromCart = asyncHandler(async (req, res) => {
     select: "name price image stockQty",
   });
 
-  cart.items = cart.items.filter((item) => {
-    if (item.menuItem) {
-      return item;
-    }
-  });
+  cart.items = cart.items.filter((item) => item.menuItem);
 
   const menuIdOnly = cart.items.map((item) => item.menuItem._id);
   const menus = await menuModel.find({
