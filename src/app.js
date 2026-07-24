@@ -19,6 +19,7 @@ import ApiError from "./utils/apiErrors.js";
 import passport from "./config/passport.js";
 import cors from "cors";
 import config from "./config/config.js";
+import repairRouter from "./routes/repairRequest.routes.js";
 
 const app = express();
 const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
@@ -78,6 +79,7 @@ app.use("/api/user/homepage", homePageRouter);
 app.use("/api/marketplace", marketRouter);
 app.use("/api/marketplace", marketCartRouter);
 app.use("/api/marketplace", marketPlaceOrdersRouter);
+app.use("/api/repair-requests",repairRouter)
 
 app.use((req, res) => {
   return res.status(404).json({
@@ -89,7 +91,7 @@ app.use((req, res) => {
   });
 });
 
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;
 
   return res.status(statusCode).json({
